@@ -19,7 +19,6 @@ library(L0glm)
 library(Matrix)
 library(nnls)
 library(parallel)
-
 library(Rcpp)
 library(RcppArmadillo)
 library(RMassBank) # for building the target table
