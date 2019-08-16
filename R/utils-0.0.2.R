@@ -156,13 +156,13 @@ check.for.backups <- function(dir, pattern = "[.]rds$"){
     cat("Backup file was found.\nDo you want to restart the run ('yes') or load the backup ('no')?")
     resp <- ""
     while(!resp %in% c("yes", "no")){
-      resp <- readline(prompt = "[yes] or [no]: ")
+      resp <- readline(prompt = "Restart run? [yes] or [no]: ")
     }
     if(resp == "yes"){
       return(NULL)
     } else {
       if(length(bckup) > 1) bckup <- bckup[order(bckup, decreasing = TRUE)][1]
-      return(readRDS(bckup))
+      return(readRDS(paste0(dir, bckup)))
     }
   } else {
     return(NULL)
@@ -235,7 +235,7 @@ normS <- function(S, by=2, ntype = 1){
 #   output.dir: the directory were results and backups will be saved
 #   plot.dir:   the directory were plots will be saved. When NULL, no plotting.
 #   samples.df: a data.frame with the parsed sample information
-#   targets.df: a data.frame with the parsed target information or NULL if no
+#   compounds.df: a data.frame with the parsed target information or NULL if no
 #               file was supplied
 
 
@@ -309,7 +309,7 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
                                 bas.degree = 3, # degree of the piecewise polynomial
                                 bas.subsamp = 10, # subsampling factor when fitting the baseline
                                 # Deconvolution parameters
-                                untargeted = TRUE,
+                                untargeted.samples = "all",
                                 win.size = 300,
                                 peak.width.range = c(1,20),
                                 peak.trim = 1E-10,
@@ -337,11 +337,11 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
   if(tail(strsplit(base.dir, "")[[1]], 1) != "/") base.dir <- paste0(base.dir, "/") # Make sure that the last character of the path is "/"
   # Create an output directory
   output.dir <- paste0(base.dir, "Output/")
-  if(!dir.exists(output.dir) & !dir.create(output.dir)) stop(paste0("Could not create the output directory: ", output.dir))
+  if(!dir.exists(output.dir) & !dir.create(output.dir, showWarnings = FALSE)) stop(paste0("Could not create the output directory: ", output.dir))
   # Create a plot directory
   if(Plot){
     plot.dir <- paste0(base.dir, "Plots/")
-    if(!dir.exists(plot.dir) & !dir.create(plot.dir)) stop(paste0("Could not create the plot directory: ", plot.dir))
+    if(!dir.exists(plot.dir) & !dir.create(plot.dir, showWarnings = FALSE)) stop(paste0("Could not create the plot directory: ", plot.dir))
   } else {
     plot.dir <- NULL
   }
@@ -351,30 +351,46 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
   if(!grepl(pattern = "[.]csv$", x = sample.file)) stop("Sample file is expected to be a CSV file.")
   samples.df <- read.csv(sample.file, stringsAsFactors = FALSE, check.names = FALSE, header = TRUE)
   samples.df <- check.sample.table(samples.df)
+  standards.df <- samples.df[samples.df$type == "standard",]
+  samples.df <- samples.df[samples.df$type != "standard",]
+
   if(verbose) cat(" loaded without error.\n")
   # Load the target table
   if(!is.null(compound.file)){
     if(verbose) cat("Loading the compound file...")
     if(!grepl(pattern = base.dir, x = compound.file)) compound.file <- paste0(base.dir, compound.file)
     if(!grepl(pattern = "[.]csv$", x = compound.file)) stop("The compound file is expected to be a CSV file.")
-    targets.df <- read.csv(compound.file, stringsAsFactors = FALSE, check.names = FALSE, header = TRUE)
-    targets.df <- check.target.table(targets.df)
+    compounds.df <- read.csv(compound.file, stringsAsFactors = FALSE, check.names = FALSE, header = TRUE)
+    compounds.df <- check.target.table(compounds.df)
     if(verbose) cat(" loaded without error.\n")
   } else {
-    targets.df <- NULL
+    compounds.df <- NULL
   }
   # Check the reference sample
-
   if(is.numeric(ref.samp)) ref.samp <- samples.df$file[ref.samp]
   if(!file.exists(ref.samp)) stop(paste0("Could not find reference sample file: ", ref.samp))
-
+  # Check the sample to undergo untargeted deconvolution
+  all.samples <- (1:nrow(samples.df))[samples.df$type != "standard"]
+  if(identical(untargeted.samples, "all")){
+    untargeted.samples <- all.samples
+  } else if(is.character(untargeted.samples)){
+    untargeted.samples <- which(samples.df$name == untargeted.samples)
+  } else {
+    stop("Untargeted samples should be a vector of strings containing the sample names.")
+  }
+  if(length(untargeted.samples) == 0) stop("At least one sample must be processed using untargeted deconvolution. Supply 'untargeted.samples' as sample names (contained in the sample table).")
+  if(max(untargeted.samples) > nrow(samples.df)) stop("Sample index exceeds number of rows of the sample table.")
+  # TODO this will have to change with FAME standards
+  if(any(samples.df$type[untargeted.samples] == "standard")) stop("You cannot supply samples with standards for untargeted dconvolution. This will automatically be performed in the RT calibration.")
+  # Get the targeted samples (the remaining samples)
+  targeted.samples <- all.samples[!all.samples %in% untargeted.samples]
 
   if(verbose) cat(paste0("\nBase directory: ", base.dir, "\n",
                          "Number of samples: ", nrow(samples.df), "\n",
-                         "Number of target compounds: ", ifelse(is.null(targets.df), 0, nrow(targets.df)), "\n"))
+                         "Number of library compounds: ", ifelse(is.null(compounds.df), 0, nrow(compounds.df)), "\n"))
   # Return the variable
   return(list(base.dir = base.dir,  output.dir = output.dir, plot.dir = plot.dir,
-              samples.df = samples.df, targets.df = targets.df,
+              samples.df = samples.df, standards.df = standards.df,  compounds.df = compounds.df,
               verbose = verbose, save.backup = save.backup, ncores = ncores,
               # RT calibration
               ref.samp = ref.samp,  mz.ignore = mz.ignore,  lib.type = lib.type,
@@ -383,7 +399,8 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
               bas.tau = bas.tau, bas.nknots = bas.nknots, bas.degree = bas.degree,
               bas.subsamp = bas.subsamp,
               # Deconvolution parameters
-              untargeted = untargeted, win.size = win.size, peak.width.range = peak.width.range,
+              untargeted.samples = untargeted.samples, targeted.samples = targeted.samples,
+              win.size = win.size, peak.width.range = peak.width.range,
               peak.trim = peak.trim, cutoff = cutoff, lives = lives, stop.thres = stop.thres,
               tau = tau, cobs.tau = cobs.tau, eps = eps, maxiter = maxiter, tol = tol,
               basfun.u = basfun.u, sel.power = sel.power, t.power = t.power,
@@ -406,7 +423,7 @@ RT.calibration <- function(params){
   save.backup <- params$save.backup
   verbose <- params$verbose
   # Sample information
-  samples.df <- params$samples.df
+  standards.df <- params$standards.df
   mz.ignore <- params$mz.ignore
   # RT calibration parameters
   ref.samp <- params$ref.samp
@@ -440,7 +457,7 @@ RT.calibration <- function(params){
   # Subfolder for plotting
   if(!is.null(plot.dir)){
     plot.subdir <- paste0(plot.dir, "1-Sample alignment/")
-    dir.create(plot.subdir)
+    dir.create(plot.subdir, showWarnings = FALSE)
   }
 
   if(verbose) cat(paste0("====== RT extraction of calibration compounds ======\n\n",
@@ -451,7 +468,7 @@ RT.calibration <- function(params){
 
   # Extract RT information from standards
   if(verbose) cat("Extracting the RT information from the standard samples...")
-  system.time(RT.extraction <- extract.RTs(meta.data = samples.df, ref.samp = ref.samp,
+  system.time(RT.extraction <- extract.RTs(standards.df = standards.df, ref.samp = ref.samp,
                                            lib.type = lib.type, ncores = ncores,
                                            mz.ignore = mz.ignore, plot.folder = plot.subdir,
                                            # Baseline fitting
@@ -509,23 +526,19 @@ RT.calibration <- function(params){
   }
 
   # Return the results
-  notes <- paste0("Alignment data.\n\n",
-                  "The generated list contains the RT calibration models extracted from ",
-                  sum(samples.df$type == "standard"), " sample containing ", lib.type, " as standards.\n",
+  notes <- paste0("The generated list contains the RT calibration models extracted from ",
+                  nrow(standards.df), " sample containing ", lib.type, " as standards.\n",
                   "Computed on: ", Sys.Date(), "\n",
                   "Timing: ",round((proc.time()[3] - t1)/60, 1) ," minutes\n",
                   "The RT to RI model is stored in \'RT.to.RI.model\' (used to convert the observed RT to theoretical RI)\n",
                   "The RI to reference RT model is stored in \'RI.to.RT.model\' (used to convert the theoretical RI to the reference RT)\n",
                   "Additionnaly, reference time scale and mz scale are stored, as well as the calibration data.\n")
-  if(verbose) cat(notes)
-  out <- list(samples.df = samples.df,
-              alk.df = RI.filt.df,
+  if(verbose) cat("\nOUTPUT\n\n", notes)
+  out <- list(alk.df = RI.filt.df,
               scantimes = scantimes.ref,
               mzvals = mzvals.ref,
-              ref.samp = ref.samp,
               RT.to.RI.model = RT.to.RI.fit,
               RI.to.RT.model = RI.to.refRT.fit,
-              mz.ignore = mz.ignore,
               notes = notes)
   if(save.backup){
     filen <- paste0(output.dir, "1-RT calibration with alkane ladder-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
@@ -554,8 +567,6 @@ RT.calibration <- function(params){
 # TODO doc
 preprocessing <- function(params,
                           calibration.output){
-  if(verbose) cat("======= Preprocessing samples =====\n\n")
-  t1 <- proc.time[3]
 
   # General arguments
   base.dir <- params$base.dir
@@ -581,22 +592,23 @@ preprocessing <- function(params,
   RT.to.RI.model <- calibration.output$RT.to.RI.model
   RI.to.RT.model <- calibration.output$RI.to.RT.model
 
+  if(verbose) cat("======= Preprocessing samples =====\n\n")
+  t1 <- proc.time()[3]
+
   backup <- check.for.backups(dir = output.dir, pattern = "2-Preprocessing")
   if(!is.null(backup)) return(backup)
 
-  # Remove the alkane samples
-  samples.df <- samples.df[!samples.df$type == "standard",]
   # Create subfolder for plotting
   if(!is.null(plot.dir)){
     plot.subdir <- paste0(plot.dir, "2-Preprocessing/")
-    dir.create(plot.subdir)
+    dir.create(plot.subdir, showWarnings = FALSE)
   }
   # Create subfolder for storing data
   if(is.null(data.dir)){
     data.dir <- paste0(output.dir, "disk backed data/") # TODO tempdir should be outputdir but this avoids overloading Tom's Dropbox account
-    dir.create(data.dir)
+    dir.create(data.dir, showWarnings = FALSE)
   } else if(!dir.exists(data.dir)){
-    dir.create(data.dir)
+    dir.create(data.dir, showWarnings = FALSE)
   }
 
   # Load the reference
@@ -608,14 +620,14 @@ preprocessing <- function(params,
   m <- length(scantimes)
   n <- length(mzvals)
   s <- nrow(samples.df)
-  if(verbose) cat(paste0("\nInitializing the disk-backed file\n",
-                         "Number of samples to load: ", s, "\n",
-                         "Creating the disk backed file (encoded as ", enc, ")\n\n"))
-  # TODO perform check in case file already exists
+  if(verbose) cat(paste0("Number of samples to load: ", s, "\n",
+                         "Creating the disk backed file (encoded as ", enc, ")\n"))
+  check.bigmory.matrix(data.dir, data.filename)
   data <- big.matrix(nrow = m*s, ncol = n, type = enc,
                      backingfile = paste0(data.filename, ".bin"),
                      descriptorfile = paste0(data.filename, ".desc"),
                      backingpath = data.dir)
+  if(verbose) cat(paste0("Data file stored in: ", data.dir, "\n\n"))
 
   # Preallocate the baseline components
   # TODO improve RAM usage/speed with: C.bas <- sparse.bs(x = 1:m, nknots = bas.nknots, degree = bas.degree, sparse = T) # with sparsity but not compatible with the fitting functions
@@ -625,6 +637,7 @@ preprocessing <- function(params,
   # Preprocess samples and store in the disk-backed file
   # TODO parallelize, but how to do this efficiently and error prone with bigmemory objects?
   # Note that bigmemory object cannot be changed within a parallelized loop otherwise R crashes...
+  # Solution is maybe to split samples in batches were each batch contains 'ncores' samples and parallelize within batch, save data, and serialize over beatches ?
   if(verbose) cat(paste0("Preprocessing samples...\n"))
   for (i in 1:s){
     if(samples.df$file[i] == ref.samp){
@@ -667,19 +680,19 @@ preprocessing <- function(params,
     }
 
     # 4. Fit and remove the baseline
-    win <- seq(1,m, by = bas.subsamp) # Subsample the sample for computational speed up
+    win <- seq(1, m, by = bas.subsamp) # Subsample the sample for computational speed up
     # Estimate (sample specific) spectrum profiles of the baseline using quantile regression
-    S.bas[[i]] <- fit.S.bas(M = M, C.bas = C.bas, win = win, tau = bas.tau, verbose = FALSE)
+    S.bas[[i]] <- fit.S.bas(M = M, C.bas = C.bas, win = win, tau = bas.tau)
     M <- pmax(M - tcrossprod(C.bas, S.bas[[i]]), 0)
 
     # 5. Plot the preprocessing
     if(!is.null(plot.dir)){
       png(file = paste0(plot.subdir, "Preprocessing - ", gsub("[.]|/", "-", samples.df$name[i]), ".png"), res = 300, width = 5000, height = 2500)
-      par(mfrow = c(2+rm.baseline,1), oma = c(0,0,3,0))
+      par(mfrow = c(3,1), oma = c(0,0,3,0))
       zlims <- c(0, max(M0))^0.12
-      plotmat(M0, subsamp = subsamp, plot.axes = F, zlim = zlims, main = "Raw data")
-      plotmat(M, subsamp = subsamp, plot.axes = F, zlim = zlims, main = "Preprocessed data")
-      if(rm.baseline) plotmat(tcrossprod(C.bas[win,], S.bas[[i]]), subsamp = 1, plot.axes = F, zlim = zlims, main = "Fitted baseline")
+      plotmat(M0, subsamp = 10, plot.axes = F, zlim = zlims, main = "Raw data")
+      plotmat(M, subsamp = 10, plot.axes = F, zlim = zlims, main = "Preprocessed data")
+      plotmat(tcrossprod(C.bas[win,], S.bas[[i]]), subsamp = 1, plot.axes = F, zlim = zlims, main = "Fitted baseline")
       title(main = samples.df$name[i], outer = T)
       dev.off()
     }
@@ -693,14 +706,13 @@ preprocessing <- function(params,
   }
 
   # Return results
-  notes <- paste0("Preprocessed data.\n\n",
-                  "This list contains the preprocessed data of ", nrow(samples.df), " samples\n",
+  notes <- paste0("The list contains the preprocessed data of ", nrow(samples.df), " samples\n",
                   "Computed on: ", Sys.Date(), "\n",
                   "Timing: ",round((proc.time()[3] - t1)/60, 1) ," minutes\n",
                   "The bigmemory object containing the data is stored in ", data.dir, "\n", # TODO replace with output.dir
                   "Elution profiles of the baseline are stored in C.bas and the spectrum\n",
-                  "profiles of the baseline are stored in S.bas")
-  if(verbose) cat(paste0("\n", notes))
+                  "profiles of the baseline are stored in S.bas\n")
+  if(verbose) cat(paste0("\nOUTPUT\n\n", notes, "\n"))
   out <- list(file.bin = paste0(data.dir, data.filename, ".bin"),
               file.desc = paste0(data.dir, data.filename, ".desc"),
               data.dir = data.dir,
@@ -719,14 +731,20 @@ preprocessing <- function(params,
 # deconvolution ####
 # TODO doc
 deconvolution <- function(params,
-                          calibration.output = cal.res,
-                          preprocess.output = preprocess.res){
-
+                          calibration.output,
+                          preprocess.output){
   # General parameters
-  untargeted <- params$untargeted
+  data.filename <- params$data.filename
+  data.dir <- params$data.dir
+  untargeted.samples <- params$untargeted.samples
+  targeted.samples <- params$targeted.samples
+  samples.df <- params$samples.df
   ncores <- params$ncores
   verbose <- params$verbose
   save.backup <- params$save.backup
+  # Extract parameters from calibration
+  scantimes <- calibration.output$scantimes
+  mzvals <- calibration.output$mzvals
   # Peak identification parameters
   win.size <- params$win.size
   peak.width.range <- params$peak.width.range
@@ -746,51 +764,75 @@ deconvolution <- function(params,
   win.ext <- params$win.ext
   scale.subsamp <- params$scale.subsamp
   method.upd <- params$method.upd
-  # Targeted deconvolution parameters
-  max.RI.sd <- params$max.RI.sd
-  elu.win <- params$elu.win
 
-  stop("Implement backup checking, timing, etc")
+  m <- length(scantimes)
+  n <- length(mzvals)
+  s <- nrow(samples.df)
 
-  # Perform untargeted deconvolution
-  if(untargeted){
-    untarg.res <- untargeted.deconvolution(params = params,
-                                           calibration.output = calibration.output,
-                                           preprocess.output = preprocess.output,# Peak identification arguments
-                                           verbose = verbose, save.backup = save.backup,
-                                           # Some advanced parameters (should not require to be changed)
-                                           # Peak identification
-                                           win.size = win.size, peak.width.range = peak.width.range,
-                                           peak.trim = peak.trim, cutoff = cutoff, lives = lives,
-                                           ncores = parallel::detectCores(),
-                                           # Deconvoluton
-                                           stop.thres = stop.thres, tau = tau, cobs.tau = cobs.tau,
-                                           eps = eps, maxiter = maxiter, tol = tol,
-                                           basfun.u = basfun.u, sel.power = sel.power, t.power = t.power,
-                                           win.ext = win.ext, scale.subsamp = scale.subsamp,
-                                           # Spectrum profiles update
-                                           method.upd = method.upd)
-  } else {
-    untargeted
+  if(verbose) cat("======= Deconvolution =====\n\n")
+  deconvolution.out <- check.for.backups(dir = output.dir, pattern = "5-Complete deconvolution")
+  if(!is.null(deconvolution.out)) return(deconvolution.out)
+  t1 <- proc.time()[3]
+
+  ### A. UNTARGETED
+
+  # Check the presence of a backup
+  untarg.output <- check.for.backups(dir = output.dir, pattern = "3-Untargeted deconvolution")
+  if(is.null(untarg.output)){
+    # Create the plot directory for untargeted
+    if(!is.null(plot.dir)){
+      plot.dir.untarg <- paste0(plot.dir, "3-Untargeted deconvolution/")
+      dir.create(plot.dir.untarg, showWarnings = FALSE)
+    }
+    # Perform untargeted deconvolution
+    if(verbose) cat(paste0("Performing untargeted deconvolution in ", length(params$untargeted.samples), " samples.\n"))
+    untarg.output <- untargeted.deconvolution(data.filename = data.filename, data.dir = data.dir,
+                                              m = m, n = n, s = s, samps = untargeted.samples,
+                                              scantimes = scantimes, mzvals = mzvals,
+                                              samples.df = samples.df,
+                                              output.dir = output.dir, plot.dir = plot.dir.untarg,
+                                              verbose = verbose, save.backup = save.backup,
+                                              ncores = ncores,
+                                              # Peak identification
+                                              win.size = win.size, peak.width.range = peak.width.range,
+                                              peak.trim = peak.trim, cutoff = cutoff, lives = lives,
+                                              # Deconvoluton
+                                              stop.thres = stop.thres, tau = tau, cobs.tau = cobs.tau,
+                                              eps = eps, maxiter = maxiter, tol = tol,
+                                              basfun.u = basfun.u, sel.power = sel.power, t.power = t.power,
+                                              win.ext = win.ext, scale.subsamp = scale.subsamp,
+                                              # Spectrum profiles update
+                                              method.upd = method.upd)
+    # TODO (optionally) fuse (near) identical spectrum profiles
   }
-  # Initialize target elution profiles for the
-  if(!is.null(params$targets.df)){
-    # Initialize profiles using targeted deconvolution
-    targ.init <- targeted.deconvolution(params = params, calibration.output = calibration.output,
-                                        preprocess.outp = preprocess.outp, max.RI.sd = max.RI.sd,
-                                        elu.win = elu.win, ncores = detectCores(),
-                                        smooth = TRUE, dampen = TRUE, unimodal = FALSE,
-                                        verbose = verbose, save.backup = save.backup)
-  } else {
-    # If no targets are supplied, return empty variable
-    targ.init <- NULL
+
+  ### B. TARGETED
+
+  # Check the presence of a backup
+  targ.output <- check.for.backups(dir = output.dir, pattern = "4-Targeted deconvolution")
+  if(is.null(targ.output) && length(targeted.samples) > 0){
+    # Create the plot directory for targeted
+    if(!is.null(plot.dir)){
+      plot.dir.targ <- paste0(plot.dir, "4-Targeted deconvolution/")
+      dir.create(plot.dir.targ, showWarnings = FALSE)
+    }
+    stop("Adapt targeted.deconvolution")
+    # First fill missing elution profiles with a prior
+    C.prior <- fill.C(C = untarg.output$C, m = m, n = n, s = s,
+                      untargeted.samples =  untargeted.samples, targeted.samples = targeted.samples)
+    # Perform targeted deconvolution
+    targ.output <- targeted.deconvolution(data.filename = data.filename, data.dir = data.dir,
+                                          S = untarg.output$S, C.prior = C.prior,
+                                          m = m, samps = c(untargeted.samples, targeted.samples),
+                                          samples.df = samples.df, scantimes = scantimes, mzvals = mzvals,
+                                          output.dir = output.dir, plot.dir = plot.dir.targ,
+                                          verbose = verbose, save.backup = save.backup,
+                                          ncores = ncores, t.power = t.power, cobs.tau = cobs.tau,
+                                          smooth = FALSE, dampen = FALSE, unimodal = TRUE)
   }
-  # Check if any deconvolution was performed
-  if(is.null(targ.init) && is.null(untarg.res)) stop("You must at least perform untargeted deconvolution (set 'untargeted = TRUE') or targeted deconvolution (provide a target list in 'new.run()').")
 
-  # Perform the mixed targeted/untargeted deconvolution as a final elution update step
-
-  # TODO make return
+  if(verbose) cat(paste0("\nOUTPUT\n\n", targ.output$notes, "\n"))
+  return(targ.output)
 }
 
 
@@ -823,7 +865,7 @@ check.sample.table <- function(x){
 # check.target.table ####
 # TODO doc
 check.target.table <- function(x){
-  req <- c("compound", "RI", "RI.sd", "spectrum", "search.size")
+  req <- c("compound", "RI", "spectrum")
   misg <- which(!req %in% colnames(x))
   if(length(misg) > 0) stop(paste0("The target table misses the following field(s): ", paste(misg, collapse = ", ")))
   # Remove NA's and
@@ -836,8 +878,6 @@ check.target.table <- function(x){
 
   # Check if values make sense
   if(any(x$RI < 0)) stop("'RI' must be nonnegative numbers.")
-  if(any(x$RI.sd < 0)) stop("'RI.sd' must be nonnegative numbers.")
-  if(any(x$search.size <= 0)) stop("'search.size' must be positive numbers.")
   # Order by expected RI
   x <- x[order(x$RI),] # sort targets with respect to RI
   return(x)
@@ -1175,7 +1215,7 @@ find.standards <- function(lib, specs, RT, RI, df = NULL, sr = NULL,
 
 # extract.RTs ####
 # TODO documentation
-extract.RTs <- function(meta.data, ref.samp, lib.type = "alkanes", ncores = 1,
+extract.RTs <- function(standards.df, ref.samp, lib.type = "alkanes", ncores = 1,
                         plot.folder = NULL, mz.ignore = NULL,
                         # Baseline fitting
                         bas.subsamp = 10, bas.tau = 0.2, bas.nknots = 15,
@@ -1189,13 +1229,8 @@ extract.RTs <- function(meta.data, ref.samp, lib.type = "alkanes", ncores = 1,
                         sel.power = 2, t.power = 2, win.ext = 25,
                         scale.subsamp = 10){
   lib.type <- match.arg(lib.type, c("alkanes", "FAMEs"))
-  # Prepare the plot folder
-  if(!is.null(plot.folder)) {
-    plot.folder <- paste0(plot.folder, "RT extraction from standards - ", gsub("[ ]|[-]|[:]", "", Sys.time()),"/")
-    dir.create(plot.folder)
-  }
+
   # Get the samples to extract RT/RI information from
-  files <- meta.data$file[meta.data$type == "standard"]
   if(is.null(files)) stop("No standard found")
   # Extract reference sample information
   M.ref <- read.cdf(file = ref.samp, mz.ignore = mz.ignore)
@@ -1216,7 +1251,7 @@ extract.RTs <- function(meta.data, ref.samp, lib.type = "alkanes", ncores = 1,
   # Prepare the cluster for parallelization
   cl <- makeCluster(ncores,type="SOCK") # on linux use type="FORK" (faster), but not available on windows
   doSNOW::registerDoSNOW(cl)
-  snow::clusterExport(cl, list=c("meta.data", "specs.lib", "files", "win.size", "plot.folder", "monoMW", "RIs",
+  snow::clusterExport(cl, list=c("standards.df", "specs.lib", "files", "win.size", "plot.folder", "monoMW", "RIs",
                                  "bas.subsamp","bas.tau","bas.nknots","bas.degree","win.size","peak.width.range",
                                  "peak.trim","cutoff","tau", "cobs.tau", "eps", "maxiter", "tol",
                                  "basfun.u", "sel.power", "t.power", "win.ext", "scale.subsamp",
@@ -1303,11 +1338,11 @@ extract.RTs <- function(meta.data, ref.samp, lib.type = "alkanes", ncores = 1,
       dev.off()
     }
     # Add required meta data for further modeling
-    meta.ind <- which(meta.data$file == file)
+    meta.ind <- which(standards.df$file == file)
     targ.df$sample <- file
-    targ.df$day <- meta.data$day[meta.ind]
-    targ.df$date <- meta.data$date[meta.ind]
-    targ.df$batch <- meta.data$batch[meta.ind]
+    targ.df$day <- standards.df$day[meta.ind]
+    targ.df$date <- standards.df$date[meta.ind]
+    targ.df$batch <- standards.df$batch[meta.ind]
     return(targ.df)
   })
   stopCluster(cl)
@@ -1433,9 +1468,12 @@ sparse.bs <- function(x, nknots, degree = 3, intercept = FALSE, sparse = FALSE){
 
 # untargeted.deconvolution ####
 # TODO doc
-untargeted.deconvolution <- function(params,
-                                     calibration.output,
-                                     preprocess.output,
+untargeted.deconvolution <- function(data.filename, data.dir,
+                                     m, n, s, samps,
+                                     scantimes, mzvals,
+                                     output.dir, plot.dir = NULL, verbose = TRUE,
+                                     save.backup = TRUE,
+                                     samples.df,
                                      # Peak identification arguments
                                      win.size = 300,
                                      peak.width.range = c(1,20),
@@ -1456,46 +1494,20 @@ untargeted.deconvolution <- function(params,
                                      win.ext = 25,
                                      scale.subsamp = 10,
                                      # Spectrum profiles update arguments
-                                     method.upd = "nnL0pois", # or "WNNLS"
-                                     # Other arguments
-                                     verbose = TRUE, save.backup = TRUE){
-  if(verbose) cat("====== Untargeted deconvolution ======\n\n")
+                                     method.upd = "nnL0pois"){ # or WNNLS
   t1 <- proc.time()[3]
-  # Extract arguments from the run list
-  output.dir <- params$output.dir
-  plot.dir <- params$plot.dir
-  samples.df <- params$samples.df
-  samples.df <- samples.df[!samples.df$type == "standard",]
-  # Extract arguments from the calibration output
-  scantimes <- calibration.output$scantimes
-  mzvals <- calibration.output$mzvals
-  # Extract arguments from the preprocessing output
-  file.desc <- preprocess.output$file.desc
-  data.dir <- preprocess.output$data.dir
-
   backup <- check.for.backups(dir = output.dir, pattern = "3-Untargeted deconvolution")
   if(!is.null(backup)) return(backup)
 
-  if(!is.null(plot.dir)){
-    plot.subdir <- paste0(plot.dir, "3-Untargeted devonvolution/")
-    dir.create(plot.subdir)
-  }
-
   # Attach matrix
-  data <- attach.big.matrix(dget(file.desc)) # Baseline removed data
-  # Duplicate matrix to keep track of residuals
-  file.name <- strsplit(file.desc, "/|[.]desc")[[1]]
-  file.name <- paste0(file.name[length(file.name)], "_resids")
-  # TODO perform check in case file already exists
-  resids <- deepcopy(data, type = "double",
-                     backingfile = paste0(file.name, ".bin"),
-                     descriptorfile = paste0(file.name, ".desc"),
+  data <- attach.big.matrix(dget(paste0(data.dir, data.filename, ".desc"))) # Baseline removed data
+  resids.filename <- paste0(data.filename, "_resids")
+  if(file.exists(paste0(data.dir, resids.filename, ".bin"))) file.remove(paste0(data.dir, resids.filename, ".bin"))
+  resids <- deepcopy(data, type = "double", # TODO maybe integer is sufficient, this reduce by 2 storage space
+                     backingfile = paste0(resids.filename, ".bin"),
+                     descriptorfile = paste0(resids.filename, ".desc"),
                      backingpath = data.dir)
   invisible(gc())
-  m <- length(scantimes)
-  n <- length(mzvals)
-  s <- nrow(samples.df)
-  samps <- 1:s
 
   # Peak identification
   # Compute the TIC for all samples
@@ -1532,10 +1544,8 @@ untargeted.deconvolution <- function(params,
                                          win.ext = win.ext, scale.subsamp = scale.subsamp,
                                          Plot = FALSE, Plot.to.file = FALSE, plot.folder = NULL, # Do not plot, only for testing
                                          verbose = verbose, debug = FALSE)
-  C <- deconv.res$C
-  S <- deconv.res$S
-  if(verbose) cat(paste0("Deconvolution finished after fitting ", deconv.res$iter, " compounds.\n\n"))
 
+  if(verbose) cat(paste0("Untargeted deconvolution finished after fitting ", deconv.res$iter, " compounds.\n\n"))
   # Plot deconvolution results
   if(!is.null(plot.dir)){
     if(verbose) cat("Plotting the deconvolution results...\n")
@@ -1545,10 +1555,10 @@ untargeted.deconvolution <- function(params,
     for(samp.plot in samps){
       win.plot <- rep(test.win, length(samp.plot))+rep(samp.plot-1, each = length(test.win))*m # Plot full chromatogram of a single sample
       # Plot fitted data
-      samp.name <- gsub(x = sample.meta$name[samp.plot], pattern = "/|[.]", replacement = "-")
-      file.name <- paste0(plot.subdir, "Deconvolution-",samp.name, ".png")
+      samp.name <- gsub(x = samples.df$name[samp.plot], pattern = "/|[.]", replacement = "-")
+      file.name <- paste0(plot.dir, "Deconvolution-",samp.name, ".png")
       plot.deconvolution.fit(M = data, M.res = resids,
-                             C = C, S = S,
+                             C = deconv.res$C, S = deconv.res$S,
                              file.name = file.name,
                              win = win.plot, m = m,
                              gam = 0.1, sub.fac = sub.fac)
@@ -1559,18 +1569,17 @@ untargeted.deconvolution <- function(params,
   # Simultaneous update of the spectrum
   # Order profiles by increasing elution time (ie scanline where maximum occures
   # in profile)
+  if(verbose) cat("Sorting profiles by increasing retention time.")
   ord <- scanline.order(C = deconv.res$C, m = m) # 35 s for 1876 compounds and 50 samples
-  C.init <- deconv.res$C[,ord,drop=F]
-  S.init <- deconv.res$S[,ord,drop=F]
   # Update spectrum profiles
-  system.time(upd <- update.spectrum(data = data, C = C.init, S = S.init, m = m,
-                                     method = method.upd, focus = TRUE, verbose = TRUE))
-  C.upd <- upd$C
-  S.upd <- upd$S
-  rm(upd)
+  system.time(upd <- update.spectrum(data = data,
+                                     C = deconv.res$C[,ord,drop=F],
+                                     S = deconv.res$S[,ord,drop=F],
+                                     m = m,
+                                     method = method.upd, focus = TRUE, verbose = verbose))
   # Plot the change in spectrum profiles
   if(!is.null(plot.dir)){
-    png(file = paste0(plot.subdir, "Spectrum update.png"), height = 3000, width = 3000, res = 300)
+    png(file = paste0(plot.dir, "Spectrum update.png"), height = 3000, width = 3000, res = 300)
     par(mfrow = c(2,1))
     plotmat(t(S.init), subsamp = 1, xlab = "Compound index", main = "Spectrum profiles before update")
     plotmat(t(S.upd), subsamp = 1, xlab = "Compound index", main = "Spectrum profiles after update")
@@ -1578,19 +1587,7 @@ untargeted.deconvolution <- function(params,
   }
 
   # Return results
-  data <- attach.big.matrix(dget(file.desc)) # Baseline removed data
-  # Duplicate matrix to keep track of residuals
-  file.name <- strsplit(file.desc, "/|[.]desc")[[1]]
-  file.name <- paste0(file.name[length(file.name)], "_resids")
-  # TODO perform check in case file already exists
-  resids <- deepcopy(data, type = "double",
-                     backingfile = paste0(file.name, ".bin"),
-                     descriptorfile = paste0(file.name, ".desc"),
-                     backingpath = data.dir)
-
-  # Return results
-  notes <- paste0("Untargeted deconvolution.\n\n",
-                  "The list contains the deconvolution results for ", s, " samples.\n",
+  notes <- paste0("The list contains the deconvolution results for ", s, " samples.\n",
                   "The algorithm stopped after fitting ", deconv.res$iter, " components\n",
                   "(based on a stopping threshold of ", stop.thres, ").\n",
                   "'deconvolution.results' contains the main function output, 'C'\n",
@@ -1599,13 +1596,12 @@ untargeted.deconvolution <- function(params,
                   "Computed on: ", Sys.Date(), "\n",
                   "Timing: ",round((proc.time()[3] - t1)/60, 1) ," minutes\n",
                   "The data is stored in: ", file.path, "\n")
-  if(verbose) cat(paste0("\n", notes))
-  out <- list(C = C.upd, S = S.upd, # Most important !
+  if(verbose) cat(paste0("\nOUTPUT\n\n", notes, "\n"))
+  out <- list(C = upd$C, S = upd$S, # Most important !
               # Disk-backed residual file
               resids.desc = paste0(data.dir, file.name, ".desc"),
               resids.bin = paste0(data.dir, file.name, ".bin"),
               # Deconvolution results
-              iter = deconv.res$iter,
               deconvolution.results = deconv.res,
               TICs.init = TICs.init, TICs.resid = TICs,
               # Peak identification
@@ -1621,6 +1617,27 @@ untargeted.deconvolution <- function(params,
   }
   return(out)
 }
+
+
+# check.bigmory.matrix ####
+# TODO doc
+check.bigmory.matrix <- function(data.dir, data.filename){
+  delete.file <- ""
+  if(file.exists(paste0(data.dir, data.filename, ".bin"))){
+    cat(paste0("The data file '", data.dir, data.filename, ".bin' already exists. Do you want to overwrite it [yes] or not [no] ?"))
+    while(!delete.file %in% c("yes", "no")){
+      delete.file <- readline(prompt = "Overwrite file? [yes] or [no]: ")
+    }
+    if(delete.file == "yes"){
+      file.remove(paste0(data.dir, data.filename, ".bin"))
+    } else {
+      cat("You can either specify a new file name ('data.filename') or a new data storage directory ('data.dir')")
+      stop("Aborting run.")
+    }
+  }
+  return(NULL)
+}
+
 
 
 # fit.average.peak.width ####
@@ -2701,11 +2718,6 @@ sequential.deconvolution <- function(resids, data = NULL,
     pdf(file = plot.file, width = 10, height = 10)
   }
 
-  # Check if there is already a previous analysis
-  if(F){
-    # TODO implement a recovery mode
-  }
-
   is.active <- as.logical(peak.locs[,"active"])
   n.active <- sum(is.active)
   max.start <- max.cur <- max(peak.locs[is.active,"height"])
@@ -2857,14 +2869,9 @@ sequential.deconvolution <- function(resids, data = NULL,
       M <- resids[sub.win,]
 
       # Fit elution profile in current sample
-      # TODO if this is not needed, delete
-      # if(samp == sub.samp){ # This elution profile was already optimized
-      #   u.fit <- c(rep(0, win.ext), u, rep(0, win.ext))
-      # } else {
       u.fit <- fit.profile(M = t(M), u = v, w = wv, tau = tau, method = "quantreg", rm.bas = TRUE)
       wu <- compute.wu(u = u.fit, power = t.power)
       u.fit <- pickLogConPeak(u.fit, mode = which.max(u.fit), tau = cobs.tau, weights = wu, basfun = basfun.u)
-      # }
 
       # Scale the elution profile
       bas <- Matrix(0, nrow = m*s, ncol = n, sparse = TRUE) # Generate a 0 baseline even in case no factor was extracted; dim(bas) == dim(resids)
@@ -3168,118 +3175,13 @@ scanline.order <- function(C, m = NULL) {
 
 
 # targeted.deconvolution ####
-# TODO doc
-targeted.deconvolution <- function(params,
-                                   calibration.output,
-                                   preprocess.outp,
-                                   untargeted.output = NULL,
-                                   max.RI.sd = 50, # what is the maximal uncertainty of an RI (avoids having too large deconlution windows)
-                                   elu.win = 60, # the expect time span an average compound would elute (in seconds)
-                                   ncores = 1,
-                                   smooth = FALSE,
-                                   dampen = FALSE,
-                                   unimodal = FALSE,
-                                   w.power = 2,
-                                   cobs.tau = 0.2,
-                                   verbose = TRUE,
-                                   save.backup = TRUE){
-  t1 <- proc.time()[3]
-  if(verbose) cat("====== Targeted deconvolution ======\n\n")
-
-  # Extract arguments from the run list
-  output.dir <- params$output.dir# from previous step
-  plot.dir <- params$plot.dir # from previous step
-  samples.df <- params$samples.df
-  samples.df <- samples.df[!samples.df$type == "standard",]
-  targets.df <- params$targets.df
-  # Extract arguments from the calibration output
-  scantimes <- calibration.output$scantimes
-  mzvals <- calibration.output$mzvals
-  RI.to.RT.model <- calibration.output$RI.to.RT.model
-  # Extract arguments from the preprocessing output
-  file.desc <- preprocess.outp$file.desc
-
-  m <- length(scantimes)
-  n <- length(mzvals)
-  s <- nrow(samples.df)
-
-  backup <- check.for.backups(dir = output.dir, pattern = "4-Targeted deconvolution")
-  if(!is.null(backup)) return(backup)
-
-
-  # Create a plotting subdirectory
-  if(!is.null(plot.dir)){
-    plot.subdir <- paste0(plot.dir, "4-Targeted devonvolution/")
-    dir.create(plot.subdir)
-  }
-  # Attach data
-  data <- attach.big.matrix(dget(file.desc)) # Baseline removed data
-
-  if(is.null(untargeted.output)){
-    # Compute the expected elution windows
-    if(verbose) cat("Computing the expected elution windows.\n")
-    targets.df <- define.elution.windows(targets.df =  targets.df, RI.to.RT.model = RI.to.RT.model,
-                                         scantimes = scantimes, max.RI.sd = max.RI.sd, elu.win = elu.win)
-    C.prior <- get.C.prior(RT.df = targets.df, m = m, s = s)
-
-    # Plot the search windows
-    if(!is.null(plot.dir)){
-      if(verbose) cat("Plotting elution windows.\n")
-      pl <- ggplot(data = cbind(y = 1:nrow(targets.df), targets.df[,c("RT.up", "RT.low")])) +
-        geom_segment(aes(x = RT.low, xend = RT.up, y = y, yend = y), color = "grey40") +
-        geom_point(aes(x = RT.low, y = y, color = "RT.low")) +
-        geom_point(aes(x = RT.up, y = y, color = "RT.up")) +
-        ylab("Compound index") + xlab("Retention time (min)") +
-        ggtitle("Distribution of the search windows ") +
-        scale_colour_manual(name = "Window bounds", labels = c(RT.up = "Upper", RT.low = "Lower"),
-                            values = c(RT.up = "red3", RT.low = "green4"))
-      graph2ppt(file = paste0(plot.subdir, "Search windows.pptx"), x = pl, aspectr = 1.35)
-    }
-    # Parse the target spectra
-    if(verbose) cat("Parse the targets spectra.\n")
-    S <- parse.spectra(targets.df$spectrum, mzout = mzvals, ntype = 2)
-
-  } else {
-    if(verbose) cat("Getting the spectra and elution profiles from the untargeted deconvolution.\n")
-    C.prior <- untargeted.output$C
-    S <- untargeted.output$S
-  }
-
-  # Extract the elution profiles of the target compounds
-  if(verbose) cat("Extract the target elution profiles.\n")
-  system.time(C <- extract.target.elution(data.file = data.desc, S = S, m = m, C.prior = C.prior,
-                                          sample.names = samples.df$name,
-                                          smooth = smooth, dampen = dampen, unimodal = unimodal,
-                                          cobs.tau = cobs.tau, ncores = ncores, plot.dir = plot.subdir))
-
-  # Return results
-  notes <- paste0("Targeted deconvolution.\n\n",
-                  "The results contain the extracted elution profiles for ", s,
-                  " samples and ", nrow(targets.df), " compounds.\n",
-                  "The target spectrum profiles and the target tables extended with",
-                  "the expected elution windows are also returned.\n",
-                  "Computed on: ", Sys.Date(), "\n",
-                  "Timing: ", round((proc.time()[3] - t1)/60, 2), " minutes.\n")
-  if(verbose) cat(notes)
-  out <- list(C = C, S = S, targets.df.ext = targets.df, notes = notes)
-  if(save.backup){
-    filen <- paste0(output.dir, "4-Targeted deconvolution-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
-    saveRDS(object = out,
-            file = filen)
-    message(paste0("Backup saved as: ", filen))
-  }
-  return(out)
-}
-
-
-# extract.target.elution ####
 #
 # Function to initialize elution profiles given elution search window and
 # expected spectrum profiles of targets. Elution profiles are initialized
 # using L0 penalized nonnegative Poisson regression.
 #
 # INPUT
-#   data.file:  a path (as character string) giving the location of the descriptor
+#   data.desc:  a path (as character string) giving the location of the descriptor
 #               file of the bigmemory matrix containing the data to deconvolute
 #   S:  a matrix with the expected spectrum profiles. The dimension should be
 #       n by k, where n is the number of column of the data and k the number of
@@ -3303,24 +3205,26 @@ targeted.deconvolution <- function(params,
 # OUTPUT
 #   C:  a sparse matrix containing the row-augmented elution profiles for all
 #       samples
-extract.target.elution <- function(data.file, S, m, C.prior, sample.names,
-                                   samps = 1:length(sample.names),
-                                   ncores = 1,
-                                   smooth = FALSE,
-                                   dampen = FALSE,
-                                   unimodal = FALSE,
-                                   cobs.tau = 0.2,
-                                   plot.dir = NULL){
-  if(!is.null(plot.dir)){
-    plot.dir <- paste0(plot.dir, "Initialization of the target elution profiles/")
-    dir.create(plot.dir)
-  }
-  stop("erijiojg")
+targeted.deconvolution <- function(data.filename, data.dir,
+                                   S, C.prior,
+                                   m, samps, samples.df,
+                                   scantimes, mzvals,
+                                   output.dir, plot.dir = NULL, verbose = TRUE,
+                                   ncores = 1, save.backup = TRUE,
+                                   t.power = 2, cobs.tau = 0.2,
+                                   smooth = FALSE, dampen = FALSE,unimodal = FALSE){
+  stop("test this function!")
+  t1 <- proc.time()[3]
+  # Get the data description file
+  data.desc <- paste0(data.dir, data.filename, ".desc")
+
+  # Extract the elution profiles given the target spectrum profiles
+  if(verbose) cat("Extract the target elution profiles.\n")
   # Prepare cluster
   cl <- makeCluster(ncores, type = "SOCK") # TODO autodetect: on linux use type="FORK" (faster), but not available on windows
   registerDoSNOW(cl)
-  snow::clusterExport(cl, list = c("S", "m", "sample.names", "C.prior",
-                                   "smooth", "dampen", "unimodal", "data.file",
+  snow::clusterExport(cl, list = c("S", "m", "samples.df", "C.prior",
+                                   "smooth", "dampen", "unimodal", "data.desc",
                                    "cobs.tau", "pickLogConPeak", "plot.dir",
                                    "plotmat"), envir = environment()) # export values that each worker needs
   # Parallelize over samples
@@ -3329,7 +3233,7 @@ extract.target.elution <- function(data.file, S, m, C.prior, sample.names,
     require(bigmemory, quietly = TRUE)
     require(L0glm, quietly = TRUE)
     # Load disk backed file and store current samples in memory (more efficient, but memory intensive !)
-    M <- attach.big.matrix(dget(data.file))
+    M <- attach.big.matrix(dget(data.desc))
     win.samp <- (1:m) + (samp-1)*m
     M.samp <- M[win.samp,]
     C.samp <- Matrix(0, nrow = m, ncol = ncol(S)) # C.samp is not a large object (+/- 30MB) so more efficient to fill it as a dense matrix
@@ -3356,6 +3260,9 @@ extract.target.elution <- function(data.file, S, m, C.prior, sample.names,
 
     # Process the elution profiles
     if(any(smooth, dampen, unimodal)){
+
+      # TODO
+      stop("Imporve the post processing, think about how to best impose unimodality, eventually slecting best peak based on the weighted cosine similarity, also remove empty compounds at the end of the update.")
 
       for(k in 1:ncol(C.samp)){
         nz <- Matrix::which(C.samp[,k] != 0)
@@ -3386,6 +3293,7 @@ extract.target.elution <- function(data.file, S, m, C.prior, sample.names,
         C.samp[win,k] <- y
       }
     }
+
     # Plot elution profiles
     if(!is.null(plot.dir)){
       png(filename = paste0(plot.dir, "Sample - ", gsub(pattern = "[.]|/", replacement = "", x = sample.names[samp]), ".png"),
@@ -3395,7 +3303,7 @@ extract.target.elution <- function(data.file, S, m, C.prior, sample.names,
       zlims <- c(0, max(M.samp))^gam
       subf <- 10
       plotmat(M.samp[seq(1, m, by = subf),], gamma = gam, zlim = zlims,
-              subsamp = 1, main = paste0("Input data - Sample ", sample.names[samp]))
+              subsamp = 1, main = paste0("Input data - Sample ", sample.df$names[samp]))
       plotmat(tcrossprod(C.samp[seq(1, m, by = subf),], S), gamma = gam,
               zlim = zlims, subsamp = 1, main = "Extracted elution profiles")
       dev.off()
@@ -3404,38 +3312,24 @@ extract.target.elution <- function(data.file, S, m, C.prior, sample.names,
   })
   stopCluster(cl)
   C <- do.call(rbind, C)
-  return(C)
-}
 
-# define.elution.windows ####
-# TODO doc
-define.elution.windows <- function(targets.df, RI.to.RT.model, scantimes,
-                                   max.RI.sd = 50, elu.win = 60){
-  targets.df <- targets.df[!is.na(targets.df$RI) & !is.na(targets.df$spectrum),] # TODO Store the removed compounds and make report at the end ?
-  targets.df <- targets.df[order(targets.df$RI),] # sort targets with respect to RI
-
-  # Infer RT based on RI. RI is supplied as an upper an lower bound depending on
-  # the uncertainty of the measure in the library
-  RI.sd <- targets.df$RI.sd
-  RI.sd[is.na(RI.sd)] <- max.RI.sd # NA can be produced if there is only a single RI entry available. Since to uncertainty is available, the set it to the max uncertainty
-  RI.sd <- pmin(RI.sd, max.RI.sd) # Bound the uncertainty
-  # hist(RI.sd)
-  RI.up <- targets.df$RI + 1.96 * RI.sd # 1.96 factor to allow having 95% chance of including the true RI (assuming RIs are normally distributed)
-  RI.low <- targets.df$RI - 1.96 * RI.sd
-  targets.df$RT.up <- predict(RI.to.RT.model, newdata = list(RI = RI.up))
-  targets.df$RT.low <- predict(RI.to.RT.model, newdata = list(RI = RI.low))
-  # Remove the compounds out of bound
-  targets.df <- targets.df[targets.df$RT.low > min(scantimes),] # TODO Store the removed compounds and make report at the end ?
-  # Adapt the search window size in function of supplies RT tolerance
-  search.size <- targets.df$search.size * elu.win/60 # scantimes are expressed in minutes
-  targets.df$RT.up <- pmin(targets.df$RT.up + search.size/2, max(scantimes))
-  targets.df$RT.low <- pmax(targets.df$RT.low - search.size/2, min(scantimes))
-  targets.df$RT <- targets.df$RT.low + (targets.df$RT.up - targets.df$RT.low)/2 # set expected RT in the middle of the window
-  # Convert RT in scantime index (in chromatograms)
-  targets.df$ind <- sapply(targets.df$RT, function(x) which.min(abs(x - scantimes)))
-  targets.df$ind.up <- sapply(targets.df$RT.up, function(x) which.min(abs(x - scantimes)))
-  targets.df$ind.low <- sapply(targets.df$RT.low, function(x) which.min(abs(x - scantimes)))
-  return(targets.df)
+  # Return results
+  notes <- paste0("Targeted deconvolution.\n\n",
+                  "The results contain the extracted elution profiles for ", length(samps),
+                  " samples and ", nrow(compounds.df), " compounds.\n",
+                  "The elution profiles are stored in 'C' and the spectrum profiles are ",
+                  "stored in 'S'.\n",
+                  "Computed on: ", Sys.Date(), "\n",
+                  "Timing: ", round((proc.time()[3] - t1)/60, 2), " minutes.\n")
+  if(verbose) cat(notes)
+  out <- list(C = C, S = S, notes = notes)
+  if(save.backup){
+    filen <- paste0(output.dir, "4-Targeted deconvolution-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
+    saveRDS(object = out,
+            file = filen)
+    message(paste0("Backup saved as: ", filen))
+  }
+  return(out)
 }
 
 
@@ -3454,24 +3348,34 @@ get.C.prior <- function(RT.df, m, s){
 }
 
 
-combine.profiles <- function(untargeted.output = NULL, targeted.output = NULL){
-  if(!is.null(untargeted.output) && !is.null(targeted.output)){
-    if(nrow(untargeted.output$C) != nrow(targeted.output$C)) stop("Targeted and untargeted were not fit on the same data.")
-    C <- cbind(untargeted.output$C, targeted.output$C)
-    S <- cbind(untargeted.output$S, targeted.output$S)
-    comp.names <- c(paste0("unknown", 1:ncol(untargeted.output$C)), targeted.output$targets.df.ext$compound)
-  } else if(!is.null(untargeted.output)){
-    C <- untargeted.output$C
-    S <- untargeted.output$S
-    comp.names <- paste0("unknown", 1:ncol(untargeted.output$C))
-  } else if(!is.null(targeted.output)){
-    C <- targeted.output$C
-    S <- targeted.output$S
-    comp.names <- targeted.output$targets.df.ext$compound
-  } else {
-    stop("No elution profiles found. Make sure to run the targeted and/or untargeted deconvolution.")
+# fill.C ####
+# TODO doc
+fill.C <- function(C, m, n, s, untargeted.samples, targeted.samples){
+  stop("test this function!")
+  # Initialize the elution profiles for the targeted samples, this is common to all the targeted samples
+  C.targ <- Matrix(0, nrow = m, ncol = n,  sparse = TRUE)
+  for(k in 1:ncol(C)){
+    elus <- C[(1:m) + (untargeted.samples-1)*m, k, drop=F]
+    nz <- Matrix::which(elus > 0)
+    if(length(nz) == 0) next()
+    win <- range(nz - (ceiling(nz/m)-1)*m)
+    win <- win[1]:win[2]
+    # TODO possible options: average profile, constant prior where nonzero
+    if(method == "average"){
+      elus <- sapply(untargeted.samples, function(samp) return(C[win + rep((samp-1)*m, length(win)),k]))
+      elus <- rowMeans(elus)
+      C.targ[win, k] <- elus
+    } else if(method == "window"){
+      C.targ[win, k] <- 1E3
+    }
   }
-  return(list(C = C, S = S, comp.names = comp.names))
+  C <- do.call(rbind, lapply(1:s, function(samp){
+    if(samp %in% untargeted.samples){
+      return(C[(1:m)+(samp-1)*m,, drop = FALSE])
+    } else {
+      return(C.targ)
+    }
+  }))
+  return(C)
 }
-
 
