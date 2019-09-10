@@ -21,7 +21,7 @@ library(nnls)
 library(parallel)
 library(Rcpp)
 library(RcppArmadillo)
-library(RMassBank) # for building the target table
+# library(RMassBank) # for building the target table
 library(rvest) # for building the target table
 library(snow)
 library(splines) # TODO needed?
@@ -212,9 +212,6 @@ normS <- function(S, by=2, ntype = 1){
 
 
 ####---- EXPORTED FUNCTIONS ----####
-
-
-# TODO Add functionality to create a spectrum table
 
 
 # initiate.parameters ####
@@ -413,11 +410,9 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
 # TODO doc
 RT.calibration <- function(params){
   # TODO allow that a reference sample is not supplied but that the users gives all the reference parameters: scantime, mzvalue, day, batch,...
-  # TODO find a better way to extract parameters (maybe using list2env)
+  # TODO avoid extraction but directly use 'params$', do this after debugging
   # Extract required parameters
   # General parameters
-  base.dir <- params$base.dir
-  output.dir <- params$output.dir
   plot.dir <- params$plot.dir
   ncores <- params$ncores
   save.backup <- params$save.backup
@@ -450,13 +445,14 @@ RT.calibration <- function(params){
   win.ext <- params$win.ext
   scale.subsamp <- params$scale.subsamp
 
-  backup <- check.for.backups(dir = output.dir, pattern = "1-RT calibration")
+  backup <- check.for.backups(dir = params$output.dir,
+                              pattern = "1-RT calibration")
   if(!is.null(backup)) return(backup)
   t1 <- proc.time()[3]
 
   # Subfolder for plotting
-  if(!is.null(plot.dir)){
-    plot.subdir <- paste0(plot.dir, "1-Sample alignment/")
+  if(!is.null(params$plot.dir)){
+    plot.subdir <- paste0(params$plot.dir, "1-Sample alignment/")
     dir.create(plot.subdir, showWarnings = FALSE)
   }
 
@@ -499,7 +495,7 @@ RT.calibration <- function(params){
   RI.to.refRT.fit <- get.RI.to.refRT.fit(RT.to.RI.fit, ref.samp = ref.samp, Plot = FALSE)
 
   # Plot calibration models
-  if(!is.null(plot.dir)){
+  if(!is.null(params$plot.dir)){
     # RT to RI models
     RTpredgrid <- expand.grid(day = unique(RI.filt.df$day), RT = seq(1, max(RI.filt.df$RT, na.rm = T), length.out = 200))
     RTpredgrid$batch <- RI.filt.df$batch[match(RTpredgrid$day, RI.filt.df$day)]
@@ -541,7 +537,7 @@ RT.calibration <- function(params){
               RI.to.RT.model = RI.to.refRT.fit,
               notes = notes)
   if(save.backup){
-    filen <- paste0(output.dir, "1-RT calibration with alkane ladder-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
+    filen <- paste0(params$output.dir, "1-RT calibration with alkane ladder-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
     saveRDS(object = out, file = filen)
     message(paste0("Backup saved as: ", filen))
   }
@@ -569,7 +565,6 @@ preprocessing <- function(params,
                           calibration.output){
 
   # General arguments
-  base.dir <- params$base.dir
   output.dir <- params$output.dir # from previous step
   plot.dir <- params$plot.dir # from previous step
   samples.df <- params$samples.df
@@ -822,8 +817,9 @@ deconvolution <- function(params,
                       untargeted.samples =  untargeted.samples, targeted.samples = targeted.samples)
     # Perform targeted deconvolution
     targ.output <- targeted.deconvolution(data.filename = data.filename, data.dir = data.dir,
-                                          S = untarg.output$S, C.prior = C.prior,
-                                          m = m, samps = c(untargeted.samples, targeted.samples),
+                                          S = untarg.output$S, C.prior = C.prior, m = m,
+                                          # Deconvolute all samples to extract profiles in targeted samples, and update profile in untargeted
+                                          samps = c(untargeted.samples, targeted.samples),
                                           samples.df = samples.df, scantimes = scantimes, mzvals = mzvals,
                                           output.dir = output.dir, plot.dir = plot.dir.targ,
                                           verbose = verbose, save.backup = save.backup,
@@ -855,7 +851,7 @@ check.sample.table <- function(x){
   # Remove NA's and
   rem <- which(is.na(x[,req]), arr.ind = TRUE)
   if(nrow(rem) > 0){
-    warning(paste0(nrow(rem), " NAs were found when checking the sample table. The associated rows are removed."))
+    warning(paste0("NAs were found when checking the sample table. The associated rows (n = ", length(unique(rem[,1])) ,") are removed."))
     # TODO save removed samples in a file
     x <- x[-rem[,1],]
   }
@@ -871,7 +867,7 @@ check.target.table <- function(x){
   # Remove NA's and
   rem <- which(is.na(x[,req]), arr.ind = TRUE)
   if(nrow(rem) > 0){
-    warning(paste0(nrow(rem), " NAs were found when checking the target table. The associated rows are removed."))
+    warning(paste0("NAs were found when checking the target table. The associated rows (n = ", length(unique(rem[,1])) ,") are removed."))
     # TODO save removed compounds in a file
     x <- x[-rem[,1],]
   }
@@ -889,19 +885,21 @@ check.target.table <- function(x){
 
 
 # parse.MSP ####
+# TODO finish implementing MSP parsing functions
 parse.MSP <- function(){
 
 
 }
 
 # generate.compound.file ###
+# TODO needed ???
 # TODO doc
 # If compounds is a file should be read by read.table (sep = white space). The table
 # should not contain headers as is converted to a character vector
 #
 # Function to allow user to easily load target compound.
 generate.compound.file <- function(base.dir, library, compounds = "all", column = NULL){
-  if(!is.character(compounds)){ stop("'compounds' must be a either 'all' (fetch all compounds from the library), a vector of character strings giving compound names, or a character string giving the path to a text file containing compound names.")}
+  if(!is.character(compounds)) stop("'compounds' must be a either 'all' (fetch all compounds from the library), a vector of character strings giving compound names, or a character string giving the path to a text file containing compound names.")
   if(length(compounds) == 1 && file.exists(compounds)) {
     compounds <- as.character(as.vector(read.table(compounds, header = FALSE)))
   }
@@ -3268,15 +3266,18 @@ targeted.deconvolution <- function(data.filename, data.dir,
         nz <- Matrix::which(C.samp[,k] != 0)
         # if(length(nz) == 0) next()
         if(length(nz) == 0) return(rep(0, nrow(C.samp)))
-
         win <- min(nz):max(nz)
         y0 <- y <- C.samp[win,k]
+
         # Smooth profiles
         if(smooth){
           x <- 1:length(y)
-          y <- pmax(loess(y ~ x, degree = 1, span = 15/length(y))$fitted, 0) # TODO add argument smooth.win <- 15
+          # TODO add argument above ?
+          smooth.win <- 15
+          y <- pmax(loess(y ~ x, degree = 1, span = smooth.win/length(y))$fitted, 0)
           # y <- pmax(sgolayfilt(runmed(y, k = 15), p = 1, n = 15),0)
         }
+
         # Dampen profiles with kernel function
         if(dampen){
           win.c <- win[round(length(win)/2)] # center of the window
@@ -3284,6 +3285,8 @@ targeted.deconvolution <- function(data.filename, data.dir,
           kern <- (1-reldev^3)^5 # kernel function = (1 - reldev^a)^b where a = 3, b = 5
           y <- y * kern
         }
+
+        # Impose unimodality constraints
         if(unimodal){
           w.y <- y^2/sum(y^2)*length(y)
           peak.pos <- which.max(y)
@@ -3316,7 +3319,7 @@ targeted.deconvolution <- function(data.filename, data.dir,
   # Return results
   notes <- paste0("Targeted deconvolution.\n\n",
                   "The results contain the extracted elution profiles for ", length(samps),
-                  " samples and ", nrow(compounds.df), " compounds.\n",
+                  " samples and ", ncol(S), " compounds.\n",
                   "The elution profiles are stored in 'C' and the spectrum profiles are ",
                   "stored in 'S'.\n",
                   "Computed on: ", Sys.Date(), "\n",

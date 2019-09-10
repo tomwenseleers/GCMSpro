@@ -1,0 +1,77 @@
+"","","file","type","name","date","day","batch","beer.name","beer.number","brewery","ABV","beer.type","tasting.category"
+"1",1,"D:/Documents/beer_chromatograms_miguel/20170119_calibration/alkanes_1.cdf","standard","20170119_calibration/alkanes_1.cdf","2017-01-19",19,1,NA,NA,NA,NA,NA,NA
+"2",2,"D:/Documents/beer_chromatograms_miguel/20170120/alkanes_1.cdf","standard","20170120/alkanes_1.cdf","2017-01-20",20,1,NA,NA,NA,NA,NA,NA
+"3",3,"D:/Documents/beer_chromatograms_miguel/20170123/alkanes_1.cdf","standard","20170123/alkanes_1.cdf","2017-01-23",23,1,NA,NA,NA,NA,NA,NA
+"4",4,"D:/Documents/beer_chromatograms_miguel/20170124/alkanes_1.cdf","standard","20170124/alkanes_1.cdf","2017-01-24",24,1,NA,NA,NA,NA,NA,NA
+"5",5,"D:/Documents/beer_chromatograms_miguel/20170128/alkanes_1.cdf","standard","20170128/alkanes_1.cdf","2017-01-28",28,1,NA,NA,NA,NA,NA,NA
+"6",6,"D:/Documents/beer_chromatograms_miguel/20170129/alkanes_1.cdf","standard","20170129/alkanes_1.cdf","2017-01-29",29,1,NA,NA,NA,NA,NA,NA
+"7",7,"D:/Documents/beer_chromatograms_miguel/20170130/alkanes_1.cdf","standard","20170130/alkanes_1.cdf","2017-01-30",30,1,NA,NA,NA,NA,NA,NA
+"8",8,"D:/Documents/beer_chromatograms_miguel/20170131/alkanes_1.cdf","standard","20170131/alkanes_1.cdf","2017-01-31",31,1,NA,NA,NA,NA,NA,NA
+"9",9,"D:/Documents/beer_chromatograms_miguel/20170201/alkanes_1.cdf","standard","20170201/alkanes_1.cdf","2017-02-01",32,1,NA,NA,NA,NA,NA,NA
+"10",10,"D:/Documents/beer_chromatograms_miguel/20170202/alkanes_1.cdf","standard","20170202/alkanes_1.cdf","2017-02-02",33,1,NA,NA,NA,NA,NA,NA
+"11",11,"D:/Documents/beer_chromatograms_miguel/20170203/alkanes_1.cdf","standard","20170203/alkanes_1.cdf","2017-02-03",34,1,NA,NA,NA,NA,NA,NA
+"12",12,"D:/Documents/beer_chromatograms_miguel/20170204/alkanes_1.cdf","standard","20170204/alkanes_1.cdf","2017-02-04",35,1,NA,NA,NA,NA,NA,NA
+"13",13,"D:/Documents/beer_chromatograms_miguel/20170206/alkanes_1.cdf","standard","20170206/alkanes_1.cdf","2017-02-06",37,1,NA,NA,NA,NA,NA,NA
+"14",14,"D:/Documents/beer_chromatograms_miguel/20170208/alkanes_1.cdf","standard","20170208/alkanes_1.cdf","2017-02-08",39,1,NA,NA,NA,NA,NA,NA
+"15",15,"D:/Documents/beer_chromatograms_miguel/20170213/alkanes_1.cdf","standard","20170213/alkanes_1.cdf","2017-02-13",44,1,NA,NA,NA,NA,NA,NA
+"16",16,"D:/Documents/beer_chromatograms_miguel/20170508/alkanes_1.cdf","standard","20170508/alkanes_1.cdf","2017-05-08",128,2,NA,NA,NA,NA,NA,NA
+"17",17,"D:/Documents/beer_chromatograms_miguel/20170515/alkanes.cdf","standard","20170515/alkanes.cdf","2017-05-15",135,2,NA,NA,NA,NA,NA,NA
+"18",18,"D:/Documents/beer_chromatograms_miguel/20170518/alkanes_1.cdf","standard","20170518/alkanes_1.cdf","2017-05-18",138,2,NA,NA,NA,NA,NA,NA
+"19",19,"D:/Documents/beer_chromatograms_miguel/20170521/alkanes.cdf","standard","20170521/alkanes.cdf","2017-05-21",141,2,NA,NA,NA,NA,NA,NA
+"20",20,"D:/Documents/beer_chromatograms_miguel/20170522/alkanes.cdf","standard","20170522/alkanes.cdf","2017-05-22",142,2,NA,NA,NA,NA,NA,NA
+"21",21,"D:/Documents/beer_chromatograms_miguel/20170523/alkanes.cdf","standard","20170523/alkanes.cdf","2017-05-23",143,2,NA,NA,NA,NA,NA,NA
+"22",22,"D:/Documents/beer_chromatograms_miguel/20170524/alkanes.cdf","standard","20170524/alkanes.cdf","2017-05-24",144,2,NA,NA,NA,NA,NA,NA
+"23",23,"D:/Documents/beer_chromatograms_miguel/20170525/alkanes.cdf","standard","20170525/alkanes.cdf","2017-05-25",145,2,NA,NA,NA,NA,NA,NA
+"24",24,"D:/Documents/beer_chromatograms_miguel/20170530/alkanes_1.cdf","standard","20170530/alkanes_1.cdf","2017-05-30",150,2,NA,NA,NA,NA,NA,NA
+"25",25,"D:/Documents/beer_chromatograms_miguel/20170601/alkanes_1.cdf","standard","20170601/alkanes_1.cdf","2017-06-01",152,2,NA,NA,NA,NA,NA,NA
+"26",26,"D:/Documents/beer_chromatograms_miguel/20180315/alkane.cdf","standard","20180315/alkane.cdf","2018-03-15",439,3,NA,NA,NA,NA,NA,NA
+"28",28,"D:/Documents/beer_chromatograms_miguel/20170120/blank_IS.cdf","blank","20170120/blank_IS.cdf","2017-01-20",20,1,NA,NA,NA,NA,NA,NA
+"514",514,"D:/Documents/beer_chromatograms_miguel/20170208/5410702000805_170212224255.cdf","sample","20170208/5410702000805_170212224255.cdf","2017-02-08",39,1,"Saison Dupont Bio",187,"Brasserie Dupont",5.5,"saison, biologisch","saison"
+"99",99,"D:/Documents/beer_chromatograms_miguel/20170130/5412983140027.cdf","sample","20170130/5412983140027.cdf","2017-01-30",30,1,"Bon Secours Brune",17,"Brasserie Caulier",8,"high fermentation, bruin","bruin"
+"446",446,"D:/Documents/beer_chromatograms_miguel/20170123/549619093094_170124071003.cdf","sample","20170123/549619093094_170124071003.cdf","2017-01-23",23,1,"Kriek Girardin",117,"Brouwerij Girardin",5,"lambiek","kriek"
+"151",151,"D:/Documents/beer_chromatograms_miguel/20170124/5411276100540_a.cdf","sample","20170124/5411276100540_a.cdf","2017-01-24",24,1,"Floreffe Dubbel",69,"Brasserie Lefebvre",6.3,"Abbey Beer","dubbel"
+"177",177,"D:/Documents/beer_chromatograms_miguel/20170123/5411676710004.cdf","sample","20170123/5411676710004.cdf","2017-01-23",23,1,"Hopus Primeur 2016",95,"Brasserie Lefebvre",8.3,"ale","hoppy"
+"420",420,"D:/Documents/beer_chromatograms_miguel/20170515/5425029490024_170516205340.cdf","sample","20170515/5425029490024_170516205340.cdf","2017-05-15",135,2,"Hertenheer",90,"Brouwerij Het Nest",6.5,"high fermentation, amber","blond"
+"127",127,"D:/Documents/beer_chromatograms_miguel/20170521/5425025910410.cdf","sample","20170521/5425025910410.cdf","2017-05-21",141,2,"De Vlier Brut",45,"Brouwerij De Vlier",8,"blond","brut"
+"131",131,"D:/Documents/beer_chromatograms_miguel/20170202/5412186000098.cdf","sample","20170202/5412186000098.cdf","2017-02-02",33,1,"Delirium Tremens",49,"Brouwerij Huyghe",9,"tripel","tripel"
+"413",413,"D:/Documents/beer_chromatograms_miguel/20170129/5410263015669_170130020326.cdf","sample","20170129/5410263015669_170130020326.cdf","2017-01-29",29,1,"Grimbergen Blond",83,"Grimbergen",6.7,"Abbey Beer, high fermentation","blond"
+"462",462,"D:/Documents/beer_chromatograms_miguel/20170120/LKB_2.cdf","sample","20170120/LKB_2.cdf","2017-01-20",20,1,"Liefmans Kriek Brut",134,"Brewery Liefmans",6,"kriek","kriek"
+"249",249,"D:/Documents/beer_chromatograms_miguel/20170209/875213000068.cdf","sample","20170209/875213000068.cdf","2017-02-09",40,1,"Petrus Oud Bruin",168,"Brouwerij De Brabandere",5.5,"oud bruin","oud bruin"
+"50",50,"D:/Documents/beer_chromatograms_miguel/20170518/blank_170519173855.cdf","blank","20170518/blank_170519173855.cdf","2017-05-18",138,2,NA,NA,NA,NA,NA,NA
+"208",208,"D:/Documents/beer_chromatograms_miguel/20170523/8711406995631.cdf","sample","20170523/8711406995631.cdf","2017-05-23",143,2,"La Trappe Witte",126,"Brouwerij de Koningshoeven",5.5,"trappist","wit"
+"326",326,"D:/Documents/beer_chromatograms_miguel/20170203/5425029020078.cdf","sample","20170203/5425029020078.cdf","2017-02-03",34,1,"Winter Mess 2016",248,"Brasserie de la Senne",8.5,"christmas beer","christmas"
+"232",232,"D:/Documents/beer_chromatograms_miguel/20170129/5411656050212.cdf","sample","20170129/5411656050212.cdf","2017-01-29",29,1,"Mort Subite Oude Kriek",151,"Brasserie Mort Subite",6.5,"kriek","kriek"
+"306",306,"D:/Documents/beer_chromatograms_miguel/20170201/5425006700054.cdf","sample","20170201/5425006700054.cdf","2017-02-01",32,1,"Troubadour Obscura",228,"Brouwerij The Musketeers",8.2,"stout","stout/porter"
+"339",339,"D:/Documents/beer_chromatograms_miguel/20170129/5411081004736_170129234546.cdf","sample","20170129/5411081004736_170129234546.cdf","2017-01-29",29,1,"Bacchus",9,"Bierkasteel van Honsebrouck",4.5,"oud bruin","oud bruin"
+"228",228,"D:/Documents/beer_chromatograms_miguel/20170206/8715608222557.cdf","sample","20170206/8715608222557.cdf","2017-02-06",37,1,"Mongozo Premium Pilsener",147,"Brouwerij Huyghe",5,"pils, biologisch","pils/lager"
+"415",415,"D:/Documents/beer_chromatograms_miguel/20170208/5412138802510_170209131408.cdf","sample","20170208/5412138802510_170209131408.cdf","2017-02-08",39,1,"Grisette Blanche",85,"Brasserie Saint-Feuillien",5,"witbier","wit"
+"194",194,"D:/Documents/beer_chromatograms_miguel/20170128/5411081003654.cdf","sample","20170128/5411081003654.cdf","2017-01-28",28,1,"Kasteel Rouge",112,"Bierkasteel van Honsebrouck",8,"kriek","kriek"
+"207",207,"D:/Documents/beer_chromatograms_miguel/20170523/8711406995495.cdf","sample","20170523/8711406995495.cdf","2017-05-23",143,2,"La Trappe Quadrupel",125,"Brouwerij de Koningshoeven",10,"trappist","strong ale"
+"350",350,"D:/Documents/beer_chromatograms_miguel/20170123/5425028290311_170124162053.cdf","sample","20170123/5425028290311_170124162053.cdf","2017-01-23",23,1,"Broeder Jacob Double Port",20,"Brouwerij Broeder Jacob",9,"porter","stout/porter"
+"58",58,"D:/Documents/beer_chromatograms_miguel/20180315/blank_6_B.cdf","blank","20180315/blank_6_B.cdf","2018-03-15",439,3,NA,NA,NA,NA,NA,NA
+"78",78,"D:/Documents/beer_chromatograms_miguel/20170201/sa.cdf","control","20170201/sa.cdf","2017-02-01",32,1,"Stella Artois",209,"Brouwerij Artois",5.2,"pils, lager","pils/lager"
+"523",523,"D:/Documents/beer_chromatograms_miguel/20170522/5425031010012_170523083715.cdf","sample","20170522/5425031010012_170523083715.cdf","2017-05-22",142,2,"Seefbier",196,"Antwerpse Brouw Compagnie",6.5,"high fermentation","blond"
+"531",531,"D:/Documents/beer_chromatograms_miguel/20170209/000054079052_170211163416.cdf","sample","20170209/000054079052_170211163416.cdf","2017-02-09",40,1,"St. Bernardus Witbier",204,"Brouwerij St. Bernardus",5.5,"witbier","wit"
+"526",526,"D:/Documents/beer_chromatograms_miguel/20170126/0850413005204_170127024853.cdf","sample","20170126/0850413005204_170127024853.cdf","2017-01-26",26,1,"Spencer IPA",199,"St. Joseph's abbey",7.2,"IPA","hoppy"
+"553",553,"D:/Documents/beer_chromatograms_miguel/20170206/525006700405_170207192758.cdf","sample","20170206/525006700405_170207192758.cdf","2017-02-06",37,1,"Troubadour Westkust",229,"Brouwerij The Musketeers",9.2,"bruin, high fermentation","strong ale"
+"240",240,"D:/Documents/beer_chromatograms_miguel/20170129/5425007810806.cdf","sample","20170129/5425007810806.cdf","2017-01-29",29,1,"Oude Kriek 3 Fonteinen",159,"Brouwerij 3 Fonteinen",5,"lambiek, kriek","kriek"
+"225",225,"D:/Documents/beer_chromatograms_miguel/20170522/5413970140396.cdf","sample","20170522/5413970140396.cdf","2017-05-22",142,2,"Malheur Dark Brut",143,"Brouwerij Malheur",12,"donkerbruin","strong ale"
+"412",412,"D:/Documents/beer_chromatograms_miguel/20170522/5425006240024_170523105220.cdf","sample","20170522/5425006240024_170523105220.cdf","2017-05-22",142,2,"Gouden Carolus Tripel",82,"Brouwerij Het Anker",9,"tripel","tripel"
+"332",332,"D:/Documents/beer_chromatograms_miguel/20170213/5425007658880_170214210105.cdf","sample","20170213/5425007658880_170214210105.cdf","2017-02-13",44,1,"Achel 8 Bruin",2,"Achelse Kluis",8,"trappist, bruin","bruin"
+"57",57,"D:/Documents/beer_chromatograms_miguel/20180315/blank_6_A.cdf","blank","20180315/blank_6_A.cdf","2018-03-15",439,3,NA,NA,NA,NA,NA,NA
+"158",158,"D:/Documents/beer_chromatograms_miguel/20170524/5410228134879.cdf","sample","20170524/5410228134879.cdf","2017-05-24",144,2,"Ginder Ale",76,"Brewery Martinas",5.1,"high fermentation, amber","blond"
+"235",235,"D:/Documents/beer_chromatograms_miguel/20170213/5411858000145.cdf","sample","20170213/5411858000145.cdf","2017-02-13",44,1,"Omer.",154,"Brouwerij Omer Vander Ghinste",8,"high fermentation, blond","tripel"
+"534",534,"D:/Documents/beer_chromatograms_miguel/20170120/SLPP_2.cdf","sample","20170120/SLPP_2.cdf","2017-01-20",20,1,"St. Louis Premium Pêche",207,"Bierkasteel van Honsebrouck",2.6,"fruitbier","fruitbeer"
+"103",103,"D:/Documents/beer_chromatograms_miguel/20170208/000054112018.cdf","sample","20170208/000054112018.cdf","2017-02-08",39,1,"Brugge Tripel",21,"Brewery De Gouden Boom",8.7,"speciaalbier, high fermentation","tripel"
+"340",340,"D:/Documents/beer_chromatograms_miguel/20170208/5411831000742_170213010032.cdf","sample","20170208/5411831000742_170213010032.cdf","2017-02-08",39,1,"Bavik Premium Pils",10,"Brouwerij De Brabandere",5.2,"pils","pils/lager"
+"201",201,"D:/Documents/beer_chromatograms_miguel/20170523/5425026610197.cdf","sample","20170523/5425026610197.cdf","2017-05-23",143,2,"La Corne du Bois des Pendus Black",119,"Brasserie d'Ebly",8,"donker","stout/porter"
+"418",418,"D:/Documents/beer_chromatograms_miguel/20170129/5413963100017_170130173042.cdf","sample","20170129/5413963100017_170130173042.cdf","2017-01-29",29,1,"Guldenberg",88,"Brouwerij De Ranke",8.5,"blond, Abbey Beer","blond"
+"198",198,"D:/Documents/beer_chromatograms_miguel/20170126/0608782666133.cdf","sample","20170126/0608782666133.cdf","2017-01-26",26,1,"Kriek Cantillon 100 Lambic",116,"Brewery Cantillon",5.5,"lambiek","kriek"
+"251",251,"D:/Documents/beer_chromatograms_miguel/20170204/5410228141174.cdf","sample","20170204/5410228141174.cdf","2017-02-04",35,1,"Piedbœuf Triple",170,"Brasserie Jupiler",3.8,"tafelbier","low_no alcohol"
+"450",450,"D:/Documents/beer_chromatograms_miguel/20170124/8711406995211_b.cdf","sample","20170124/8711406995211_b.cdf","2017-01-24",24,1,"La Trappe Dubbel",122,"Brouwerij de Koningshoeven",7,"trappist","dubbel"
+"408",408,"D:/Documents/beer_chromatograms_miguel/20170202/54004009_170203145246.cdf","sample","20170202/54004009_170203145246.cdf","2017-02-02",33,1,"Gordon Finest Scotch",78,"Group John Martin",8,"scotch","scotch"
+"543",543,"D:/Documents/beer_chromatograms_miguel/20170522/5411516001491_170522191345.cdf","sample","20170522/5411516001491_170522191345.cdf","2017-05-22",142,2,"Timmermans Faro Lambic",218,"Brouwerij Timmermans",4,"faro","faro"
+"513",513,"D:/Documents/beer_chromatograms_miguel/20170120/SP_2.cdf","sample","20170120/SP_2.cdf","2017-01-20",20,1,"Saison Dupont",186,"Brasserie Dupont",6.5,"saison","saison"
+"192",192,"D:/Documents/beer_chromatograms_miguel/20170128/5411081000523.cdf","sample","20170128/5411081000523.cdf","2017-01-28",28,1,"Kasteel Donker",110,"Bierkasteel van Honsebrouck",11,"bruin","strong ale"
+"155",155,"D:/Documents/beer_chromatograms_miguel/20170126/5411024000047.cdf","sample","20170126/5411024000047.cdf","2017-01-26",26,1,"Geuze Cantillon 100 Lambic Bio",73,"Brewery Cantillon",5,"geuze","lambic"
+"70",70,"D:/Documents/beer_chromatograms_miguel/20170122/sa_2.cdf","control","20170122/sa_2.cdf","2017-01-22",22,1,"Stella Artois",209,"Brouwerij Artois",5.2,"pils, lager","pils/lager"

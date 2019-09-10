@@ -1,0 +1,13 @@
+acetaldehyde
+2-methylpropanal
+ethanol
+1-propanol
+unknown acid
+hexane
+2,3-butanedione
+ethyl acetate
+isobutanol
+3-methylbutanal
+2-methylbutanal
+dimethyl ether
+ethanol_2
