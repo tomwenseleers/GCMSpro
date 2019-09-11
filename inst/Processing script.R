@@ -17,6 +17,8 @@ gc()
 # base.dir indicates the folders that contains the sample metadata table and
 # eventually the target information table. Results and plots will be saved there too.
 base.dir <- "C:/Users/Ento/Documents/Chris/GCMSpro/190815 Testing the pipeline/"
+base.dir <- "D:/Documents/Dropbox/christophe/_tests deconvolution scripts/190815 Testing the pipeline/"
+base.dir <- "H:/" # From USB stick
 setwd(base.dir)
 library(GCMSpro)
 
@@ -31,13 +33,16 @@ library(GCMSpro)
 params <- initiate.parameters(base.dir = base.dir,
                               sample.file = "beer sample table - sub.csv",
                               compound.file = "beer target table.csv",
-                              data.dir = "D:/Documents/",
+                              data.dir = "D:/Documents/temp/",
                               verbose = TRUE,
                               Plot = TRUE,
                               save.backup = TRUE,
-                              ncores = detectCores(),
+                              ncores = 20, # detectCores(),
                               untargeted.samples = c("20170201/5425006700054.cdf",
-                                                     "20170129/5411081004736_170129234546.cdf"),
+                                                     "20170129/5411081004736_170129234546.cdf",
+                                                     "20170202/54004009_170203145246.cdf",
+                                                     "20170523/5425026610197.cdf",
+                                                     "20170213/5411858000145.cdf"),
                               # Calibration specific parameters
                               ref.samp = 1, # can be numeric (index in sample table) or character (path to sample)
                               mz.ignore = NULL,
@@ -55,7 +60,7 @@ params <- initiate.parameters(base.dir = base.dir,
                               peak.trim = 1E-10,
                               cutoff = 1,
                               lives = 2,
-                              stop.thres = 2E-4,
+                              stop.thres = 0.01,
                               tau = 0.1,
                               cobs.tau = 0.1,
                               eps = 1,

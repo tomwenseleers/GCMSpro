@@ -241,15 +241,33 @@ normS <- function(S, by=2, ntype = 1){
 
 #' Initiate parameters for a new GCMS data processing run
 #'
-#' TODO
+#' The function generates a list with all required arguments for controlling the
+#' processing of GCMS data. Input checks are performed to ensure that the
+#' supplied information complies to the expected input.
 #'
 #' @param base.dir
+#' a character string that indicates the path to the folder were to run the
+#' GCMS data processing.
 #' @param Plot
-#' @param verbose
+#' should intermediate plots be generated ? Watch out the files containing the
+#' plots will take up some disk space. Make sure to have sufficients disk space
+#' (+/- 2 MB/sample).
+#' TODO check disk space taken by files
+#' #' @param verbose
+#' should progress information be printed to the console ?
 #' @param save.backup
+#' should a backup be saved after every pipeline step ? Watch out the backup
+#' files will take up some disk space. Make sure to have sufficients disk space
+#' (+/- 5 MB/sample).
+#' TODO check disk space taken by files
 #' @param ncores
+#' Number of cores to use for computation (using the \code{\link{snow}} package)
+#' of parallelized steps.
 #' @param sample.file
+#' the name or path to the CSV file containing the required sample information.
 #' @param compound.file
+#' the name or path to the CSV file containing the candidate compounds
+#' information for identification.
 #' @param ref.samp
 #' @param mz.ignore
 #' @param lib.type
@@ -294,6 +312,7 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
                                 # Compound information
                                 compound.file,
                                 # Calibration specific parameters
+                                # TODO allow that a reference sample is not supplied but that the users gives all the reference parameters: scantime, mzvalue, day, batch,...
                                 ref.samp = 1, # can be numeric (index in sample table) or character (path to sample)
                                 mz.ignore = NULL,
                                 lib.type = "alkanes",
@@ -371,9 +390,10 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
   if(identical(untargeted.samples, "all")){
     untargeted.samples <- all.samples
   } else if(is.character(untargeted.samples)){
-    untargeted.samples <- which(samples.df$name == untargeted.samples)
+    untargeted.samples <- which(samples.df$name %in% untargeted.samples)
+    if(length(untargeted.samples) == 0) stop("The supplied sample names for untargeted deconvolution were not found in the sample file.")
   } else {
-    stop("Untargeted samples should be a vector of strings containing the sample names.")
+    stop("Untargeted samples should be a vector of strings containing the sample names (at least one).")
   }
   if(length(untargeted.samples) == 0) stop("At least one sample must be processed using untargeted deconvolution. Supply 'untargeted.samples' as sample names (contained in the sample table).")
   if(max(untargeted.samples) > nrow(samples.df)) stop("Sample index exceeds number of rows of the sample table.")
@@ -409,45 +429,11 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
 # RT.calibration ####
 # TODO doc
 RT.calibration <- function(params){
-  # TODO allow that a reference sample is not supplied but that the users gives all the reference parameters: scantime, mzvalue, day, batch,...
-  # TODO avoid extraction but directly use 'params$', do this after debugging
-  # Extract required parameters
-  # General parameters
-  plot.dir <- params$plot.dir
-  ncores <- params$ncores
-  save.backup <- params$save.backup
-  verbose <- params$verbose
-  # Sample information
-  standards.df <- params$standards.df
-  mz.ignore <- params$mz.ignore
-  # RT calibration parameters
-  ref.samp <- params$ref.samp
-  lib.type <- params$lib.type
-  # Deconvolution parameters
-  bas.subsamp <- params$bas.subsamp
-  bas.tau <- params$bas.tau
-  bas.nknots <- params$bas.nknots
-  bas.degree <- params$bas.degree
-  # Peak identification
-  win.size <- params$win.size
-  peak.width.range <- params$peak.width.range
-  peak.trim <- params$peak.trim
-  cutoff <- params$cutoff
-  # Deconvolution
-  tau <- params$tau
-  cobs.tau <- params$cobs.tau
-  eps <- params$eps
-  maxiter <- params$maxiter
-  tol <- params$tol
-  basfun.u <- params$basfun.u
-  sel.power <- params$sel.power
-  t.power <- params$t.power
-  win.ext <- params$win.ext
-  scale.subsamp <- params$scale.subsamp
-
-  backup <- check.for.backups(dir = params$output.dir,
-                              pattern = "1-RT calibration")
+  if(params$verbose) cat("====== RT extraction of calibration compounds ======\n\n")
+  # Search for backups
+  backup <- check.for.backups(dir = params$output.dir, pattern = "1-RT calibration")
   if(!is.null(backup)) return(backup)
+  # Start timing
   t1 <- proc.time()[3]
 
   # Subfolder for plotting
@@ -456,30 +442,28 @@ RT.calibration <- function(params){
     dir.create(plot.subdir, showWarnings = FALSE)
   }
 
-  if(verbose) cat(paste0("====== RT extraction of calibration compounds ======\n\n",
-                         "Number of samples: ", sum(samples.df$type == "standard"), "\n",
-                         "Number of cores: ", ncores, "\n",
-                         "Calibration compounds: ", lib.type, "\n\n"))
-
+  if(params$verbose) cat(paste0("Number of samples: ", nrow(params$standards.df), "\n",
+                                "Number of cores: ", params$ncores, "\n",
+                                "Calibration compounds: ", params$lib.type, "\n\n"))
 
   # Extract RT information from standards
-  if(verbose) cat("Extracting the RT information from the standard samples...")
-  system.time(RT.extraction <- extract.RTs(standards.df = standards.df, ref.samp = ref.samp,
-                                           lib.type = lib.type, ncores = ncores,
-                                           mz.ignore = mz.ignore, plot.folder = plot.subdir,
-                                           # Baseline fitting
-                                           # TODO get the parameters out of params?
-                                           bas.subsamp = bas.subsamp, bas.tau = bas.tau,
-                                           bas.nknots = bas.nknots, bas.degree = bas.degree,
-                                           # Peak identification
-                                           win.size = win.size, peak.width.range = peak.width.range,
-                                           peak.trim = peak.trim, cutoff = cutoff,
-                                           # Deconvolution
-                                           tau = tau, cobs.tau = cobs.tau, eps = eps, maxiter = maxiter,
-                                           tol = tol, basfun.u = basfun.u, sel.power = sel.power,
-                                           t.power = t.power, win.ext = win.ext,
-                                           scale.subsamp = scale.subsamp))
-  if(verbose) cat("done\n\n")
+  if(params$verbose) cat("Extracting the RT information from the standard samples...")
+  RT.extraction <- extract.RTs(standards.df = params$standards.df, ref.samp = params$ref.samp,
+                               lib.type = params$lib.type, ncores = params$ncores,
+                               mz.ignore = params$mz.ignore, plot.folder = plot.subdir,
+                               # Baseline fitting
+                               # TODO get the parameters out of params?
+                               bas.subsamp = params$bas.subsamp, bas.tau = params$bas.tau,
+                               bas.nknots = params$bas.nknots, bas.degree = params$bas.degree,
+                               # Peak identification
+                               win.size = params$win.size, peak.width.range = params$peak.width.range,
+                               peak.trim = params$peak.trim, cutoff = params$cutoff,
+                               # Deconvolution
+                               tau = params$tau, cobs.tau = params$cobs.tau, eps = params$eps,
+                               maxiter = params$maxiter, tol = params$tol, basfun.u = params$basfun.u,
+                               sel.power = params$sel.power, t.power = params$t.power, win.ext = params$win.ext,
+                               scale.subsamp = params$scale.subsamp)
+  if(params$verbose) cat("done\n\n")
   RI.df <- RT.extraction$RI.df
   scantimes.ref <- RT.extraction$scantimes.ref
   mzvals.ref <- RT.extraction$mzvals.ref
@@ -487,12 +471,12 @@ RT.calibration <- function(params){
   # Generate the RI to RT model based on the extracted data
   # TODO constraint fit to nonnegative predictions
   # TODO adjust dof automatically
-  if(verbose) cat("Build the RT/RI calibration models\n\n")
+  if(params$verbose) cat("Build the RT/RI calibration models\n\n")
   RT.to.RI.fit <- get.RT.to.RI.fit(alk.df = RI.df, rm.outliers = TRUE,
                                    formul = NULL, dof = 10, Plot = FALSE)
   RI.filt.df <- attr(RT.to.RI.fit, "data")
   # Generate a model that maps the theoretical RI to a reference RT scale
-  RI.to.refRT.fit <- get.RI.to.refRT.fit(RT.to.RI.fit, ref.samp = ref.samp, Plot = FALSE)
+  RI.to.refRT.fit <- get.RI.to.refRT.fit(RT.to.RI.fit, ref.samp = params$ref.samp, Plot = FALSE)
 
   # Plot calibration models
   if(!is.null(params$plot.dir)){
@@ -518,25 +502,25 @@ RT.calibration <- function(params){
       theme(plot.title = element_text(hjust = 0.5))
     graph2ppt(fun = function(){ suppressWarnings(print(p)) },
               file = paste0(plot.subdir, "RI to reference RT calibration model.ppt"))
-    if(verbose) message(paste0("Plots were saved in: ", plot.subdir))
+    if(params$verbose) message(paste0("Plots were saved in: ", plot.subdir))
   }
 
   # Return the results
   notes <- paste0("The generated list contains the RT calibration models extracted from ",
-                  nrow(standards.df), " sample containing ", lib.type, " as standards.\n",
+                  nrow(params$standards.df), " sample containing ", params$lib.type, " as standards.\n",
                   "Computed on: ", Sys.Date(), "\n",
                   "Timing: ",round((proc.time()[3] - t1)/60, 1) ," minutes\n",
                   "The RT to RI model is stored in \'RT.to.RI.model\' (used to convert the observed RT to theoretical RI)\n",
                   "The RI to reference RT model is stored in \'RI.to.RT.model\' (used to convert the theoretical RI to the reference RT)\n",
                   "Additionnaly, reference time scale and mz scale are stored, as well as the calibration data.\n")
-  if(verbose) cat("\nOUTPUT\n\n", notes)
+  if(params$verbose) cat("\nOUTPUT\n\n", notes)
   out <- list(alk.df = RI.filt.df,
               scantimes = scantimes.ref,
               mzvals = mzvals.ref,
               RT.to.RI.model = RT.to.RI.fit,
               RI.to.RT.model = RI.to.refRT.fit,
               notes = notes)
-  if(save.backup){
+  if(params$save.backup){
     filen <- paste0(params$output.dir, "1-RT calibration with alkane ladder-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
     saveRDS(object = out, file = filen)
     message(paste0("Backup saved as: ", filen))
@@ -563,100 +547,82 @@ RT.calibration <- function(params){
 # TODO doc
 preprocessing <- function(params,
                           calibration.output){
-
-  # General arguments
-  output.dir <- params$output.dir # from previous step
-  plot.dir <- params$plot.dir # from previous step
-  samples.df <- params$samples.df
-  verbose <- params$verbose
-  save.backup <- params$save.backup
-  # Data storage arguments
-  data.filename <- params$data.filename
-  enc <- params$enc
-  data.dir <- params$data.dir
-  mz.ignore <- params$mz.ignore
-  ref.samp <- params$ref.samp
-  # Baseline fitting arguments
-  bas.tau <- params$bas.tau
-  bas.nknots <- params$bas.nknots
-  bas.degree <- params$bas.degree
-  bas.subsamp <- params$bas.subsamp
-  # Extract arguments from the calibration output
-  mzvals <- calibration.output$mzvals
-  scantimes <- calibration.output$scantimes
-  RT.to.RI.model <- calibration.output$RT.to.RI.model
-  RI.to.RT.model <- calibration.output$RI.to.RT.model
-
-  if(verbose) cat("======= Preprocessing samples =====\n\n")
+  if(params$verbose) cat("======= Preprocessing samples =====\n\n")
+  # Search for backups
+  backup <- check.for.backups(dir = params$output.dir, pattern = "2-Preprocessing")
+  if(!is.null(backup)) return(backup)
+  # Start timing
   t1 <- proc.time()[3]
 
-  backup <- check.for.backups(dir = output.dir, pattern = "2-Preprocessing")
-  if(!is.null(backup)) return(backup)
+  # Get the reference time scans and m/z values
+  mzvals <- calibration.output$mzvals
+  scantimes <- calibration.output$scantimes
 
   # Create subfolder for plotting
-  if(!is.null(plot.dir)){
-    plot.subdir <- paste0(plot.dir, "2-Preprocessing/")
+  if(!is.null(params$plot.dir)){
+    plot.subdir <- paste0(params$plot.dir, "2-Preprocessing/")
     dir.create(plot.subdir, showWarnings = FALSE)
   }
   # Create subfolder for storing data
-  if(is.null(data.dir)){
-    data.dir <- paste0(output.dir, "disk backed data/") # TODO tempdir should be outputdir but this avoids overloading Tom's Dropbox account
+  if(is.null(params$data.dir)){
+    data.dir <- paste0(params$output.dir, "disk backed data/") # TODO tempdir should be outputdir but this avoids overloading Tom's Dropbox account
     dir.create(data.dir, showWarnings = FALSE)
   } else if(!dir.exists(data.dir)){
     dir.create(data.dir, showWarnings = FALSE)
   }
 
   # Load the reference
-  if(verbose) cat(paste0("Loading the reference sample (", ref.samp, ")..."))
-  M.blank <- read.cdf(ref.samp, mz.ignore = mz.ignore)
-  if(verbose) cat("done\n\n")
+  if(params$verbose) cat(paste0("Loading the reference sample (", params$ref.samp, ")..."))
+  M.blank <- read.cdf(params$ref.samp, mz.ignore = params$mz.ignore)
+  if(params$verbose) cat("done\n\n")
 
   # Initialize the disk backed file
   m <- length(scantimes)
   n <- length(mzvals)
-  s <- nrow(samples.df)
-  if(verbose) cat(paste0("Number of samples to load: ", s, "\n",
-                         "Creating the disk backed file (encoded as ", enc, ")\n"))
-  check.bigmory.matrix(data.dir, data.filename)
-  data <- big.matrix(nrow = m*s, ncol = n, type = enc,
-                     backingfile = paste0(data.filename, ".bin"),
-                     descriptorfile = paste0(data.filename, ".desc"),
+  s <- nrow(params$samples.df)
+  if(params$verbose) cat(paste0("Number of samples to load: ", s, "\n",
+                                "Creating the disk backed file (encoded as ", params$enc, ")\n"))
+  check.bigmory.matrix(data.dir, params$data.filename)
+  data <- big.matrix(nrow = m*s, ncol = n, type = params$enc,
+                     backingfile = paste0(params$data.filename, ".bin"),
+                     descriptorfile = paste0(params$data.filename, ".desc"),
                      backingpath = data.dir)
-  if(verbose) cat(paste0("Data file stored in: ", data.dir, "\n\n"))
+  if(params$verbose) cat(paste0("Data file stored in: ", data.dir, "\n\n"))
 
   # Preallocate the baseline components
   # TODO improve RAM usage/speed with: C.bas <- sparse.bs(x = 1:m, nknots = bas.nknots, degree = bas.degree, sparse = T) # with sparsity but not compatible with the fitting functions
-  C.bas <- bs(x = 1:m, df = bas.nknots - bas.degree, degree = bas.degree)
+  C.bas <- bs(x = 1:m, df = params$bas.nknots - params$bas.degree, degree = params$bas.degree)
   S.bas <- list()
 
   # Preprocess samples and store in the disk-backed file
-  # TODO parallelize, but how to do this efficiently and error prone with bigmemory objects?
-  # Note that bigmemory object cannot be changed within a parallelized loop otherwise R crashes...
-  # Solution is maybe to split samples in batches were each batch contains 'ncores' samples and parallelize within batch, save data, and serialize over beatches ?
-  if(verbose) cat(paste0("Preprocessing samples...\n"))
+  # TODO parallelize, but how to do this with bigmemory objects since it cannot be changed during a loop else R crashes?
+  #      Solution is maybe to split samples in batches were each batch contains 'ncores' samples and parallelize within batch, save data, and serialize over beatches ?
+  if(params$verbose) cat(paste0("Preprocessing samples...\n"))
   for (i in 1:s){
-    if(samples.df$file[i] == ref.samp){
+    if(params$samples.df$file[i] == params$ref.samp){
       # The reference sample is already in memory, requires no calibration, and is already on the reference scale
       M <- M.blank
-      if(!is.null(plot.dir)) M0 <- M
+      if(!is.null(params$plot.dir)) M0 <- M
     } else {
       # 1. Load the file
-      M <- read.cdf(samples.df$file[i], mz.ignore = mz.ignore)
-      if(!is.null(plot.dir)) M0 <- M
+      M <- read.cdf(params$samples.df$file[i], mz.ignore = params$mz.ignore)
+      if(!is.null(params$plot.dir)) M0 <- M
       scantimes.samp <- as.numeric(rownames(M))
       mzvals.samp <- as.numeric(colnames(M))
-      day.samp <- samples.df$day[i]
-      batch.samp <- samples.df$batch[i]
+      day.samp <- params$samples.df$day[i]
+      batch.samp <- params$samples.df$batch[i]
 
       # 2. (optional) RT recalibration
-      if(!(is.null(RT.to.RI.model) && is.null(RI.to.RT.model))){
+      if(!(is.null(calibration.output$RT.to.RI.model) && is.null(calibration.output$RI.to.RT.model))){
         scantimes.samp0 <- scantimes.samp # The unaligned RT scale
         # mapping RT to the theoretical RI scale
-        RI.samp <- predict(RT.to.RI.model, newdata = data.frame(RT = scantimes.samp,
-                                                                day = day.samp,
-                                                                batch = batch.samp))
+        RI.samp <- predict(calibration.output$RT.to.RI.model,
+                           newdata = data.frame(RT = scantimes.samp,
+                                                day = day.samp,
+                                                batch = batch.samp))
         # mapping the RI to the RT scale of the reference day
-        scantimes.samp <- predict(RI.to.RT.model, newdata = data.frame(RI = RI.samp))
+        scantimes.samp <- predict(calibration.output$RI.to.RT.model,
+                                  newdata = data.frame(RI = RI.samp))
       }
 
       # 3. Interpolate samples to a common time and mz scale
@@ -675,47 +641,47 @@ preprocessing <- function(params,
     }
 
     # 4. Fit and remove the baseline
-    win <- seq(1, m, by = bas.subsamp) # Subsample the sample for computational speed up
+    win <- seq(1, m, by = params$bas.subsamp) # Subsample the sample for computational speed up
     # Estimate (sample specific) spectrum profiles of the baseline using quantile regression
-    S.bas[[i]] <- fit.S.bas(M = M, C.bas = C.bas, win = win, tau = bas.tau)
-    M <- pmax(M - tcrossprod(C.bas, S.bas[[i]]), 0)
+    S.bas[[i]] <- fit.S.bas(M = M, C.bas = C.bas, win = win, tau = params$bas.tau)
+    M <- pmax(M - Matrix::tcrossprod(C.bas, S.bas[[i]]), 0)
 
     # 5. Plot the preprocessing
-    if(!is.null(plot.dir)){
-      png(file = paste0(plot.subdir, "Preprocessing - ", gsub("[.]|/", "-", samples.df$name[i]), ".png"), res = 300, width = 5000, height = 2500)
+    if(!is.null(params$plot.dir)){
+      png(file = paste0(plot.subdir, "Preprocessing - ", gsub("[.]|/", "-", params$samples.df$name[i]), ".png"), res = 300, width = 5000, height = 2500)
       par(mfrow = c(3,1), oma = c(0,0,3,0))
       zlims <- c(0, max(M0))^0.12
       plotmat(M0, subsamp = 10, plot.axes = F, zlim = zlims, main = "Raw data")
       plotmat(M, subsamp = 10, plot.axes = F, zlim = zlims, main = "Preprocessed data")
-      plotmat(tcrossprod(C.bas[win,], S.bas[[i]]), subsamp = 1, plot.axes = F, zlim = zlims, main = "Fitted baseline")
-      title(main = samples.df$name[i], outer = T)
+      plotmat(Matrix::tcrossprod(C.bas[win,], S.bas[[i]]), subsamp = 1, plot.axes = F, zlim = zlims, main = "Fitted baseline")
+      title(main = params$samples.df$name[i], outer = T)
       dev.off()
     }
 
     # Store matrix in the bigmemory object
-    mode(M) <- enc
+    mode(M) <- params$enc
     data[(1:m)+(i-1)*m, ] <- M
     flush(data) # Store to file
     invisible(gc()) # Free up RAM
-    if(verbose) print.progress(i, s)
+    if(params$verbose) print.progress(i, s)
   }
 
   # Return results
-  notes <- paste0("The list contains the preprocessed data of ", nrow(samples.df), " samples\n",
+  notes <- paste0("The list contains the preprocessed data of ", nrow(params$samples.df), " samples\n",
                   "Computed on: ", Sys.Date(), "\n",
                   "Timing: ",round((proc.time()[3] - t1)/60, 1) ," minutes\n",
-                  "The bigmemory object containing the data is stored in ", data.dir, "\n", # TODO replace with output.dir
+                  "The bigmemory object containing the data is stored in ", data.dir, "\n",
                   "Elution profiles of the baseline are stored in C.bas and the spectrum\n",
                   "profiles of the baseline are stored in S.bas\n")
-  if(verbose) cat(paste0("\nOUTPUT\n\n", notes, "\n"))
-  out <- list(file.bin = paste0(data.dir, data.filename, ".bin"),
-              file.desc = paste0(data.dir, data.filename, ".desc"),
+  if(params$verbose) cat(paste0("\nOUTPUT\n\n", notes, "\n"))
+  out <- list(file.bin = paste0(data.dir, params$data.filename, ".bin"),
+              file.desc = paste0(data.dir, params$data.filename, ".desc"),
               data.dir = data.dir,
               C.bas = C.bas,
               S.bas = S.bas,
               notes = notes)
-  if(save.backup){
-    filen <- paste0(output.dir, "2-Preprocessing-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
+  if(params$save.backup){
+    filen <- paste0(params$output.dir, "2-Preprocessing-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
     saveRDS(object = out, file = filen)
     message(paste0("Backup saved as: ", filen))
   }
@@ -728,106 +694,100 @@ preprocessing <- function(params,
 deconvolution <- function(params,
                           calibration.output,
                           preprocess.output){
-  # General parameters
-  data.filename <- params$data.filename
-  data.dir <- params$data.dir
-  untargeted.samples <- params$untargeted.samples
-  targeted.samples <- params$targeted.samples
-  samples.df <- params$samples.df
-  ncores <- params$ncores
-  verbose <- params$verbose
-  save.backup <- params$save.backup
-  # Extract parameters from calibration
+  if(params$verbose) cat("======= Deconvolution =====\n\n")
+  # Search for backups
+  deconvolution.out <- check.for.backups(dir = params$output.dir, pattern = "5-Complete deconvolution")
+  if(!is.null(deconvolution.out)) return(deconvolution.out)
+  # Start timing
+  t1 <- proc.time()[3]
+
+  # Get the directory where the bigmemory matrix is stored
+  data.dir <- preprocess.output$data.dir
+
+  # Get the reference scan times and m/z values
   scantimes <- calibration.output$scantimes
   mzvals <- calibration.output$mzvals
-  # Peak identification parameters
-  win.size <- params$win.size
-  peak.width.range <- params$peak.width.range
-  peak.trim <- params$peak.trim
-  cutoff <- params$cutoff
-  lives <- params$lives
-  # Untargeted deconvoluton parameters
-  stop.thres <- params$stop.thres
-  tau <- params$tau
-  cobs.tau <- params$cobs.tau
-  eps <- params$eps
-  maxiter <- params$maxiter
-  tol <- params$tol
-  basfun.u <- params$basfun.u
-  sel.power <- params$sel.power
-  t.power <- params$t.power
-  win.ext <- params$win.ext
-  scale.subsamp <- params$scale.subsamp
-  method.upd <- params$method.upd
-
   m <- length(scantimes)
   n <- length(mzvals)
-  s <- nrow(samples.df)
-
-  if(verbose) cat("======= Deconvolution =====\n\n")
-  deconvolution.out <- check.for.backups(dir = output.dir, pattern = "5-Complete deconvolution")
-  if(!is.null(deconvolution.out)) return(deconvolution.out)
-  t1 <- proc.time()[3]
+  s <- nrow(params$samples.df)
 
   ### A. UNTARGETED
 
   # Check the presence of a backup
-  untarg.output <- check.for.backups(dir = output.dir, pattern = "3-Untargeted deconvolution")
+  if(params$verbose) cat(paste0("--- Untargeted Deconvolution ---\n\n"))
+  untarg.output <- check.for.backups(dir = params$output.dir, pattern = "3-Untargeted deconvolution")
   if(is.null(untarg.output)){
     # Create the plot directory for untargeted
-    if(!is.null(plot.dir)){
-      plot.dir.untarg <- paste0(plot.dir, "3-Untargeted deconvolution/")
+    if(!is.null(params$plot.dir)){
+      plot.dir.untarg <- paste0(params$plot.dir, "3-Untargeted deconvolution/")
       dir.create(plot.dir.untarg, showWarnings = FALSE)
+    } else {
+      plot.dir.untarg <- NULL
     }
     # Perform untargeted deconvolution
-    if(verbose) cat(paste0("Performing untargeted deconvolution in ", length(params$untargeted.samples), " samples.\n"))
-    untarg.output <- untargeted.deconvolution(data.filename = data.filename, data.dir = data.dir,
-                                              m = m, n = n, s = s, samps = untargeted.samples,
+    if(params$verbose) cat(paste0("Performing untargeted deconvolution in ", length(params$untargeted.samples), " samples.\n"))
+    untarg.output <- untargeted.deconvolution(data.filename = params$data.filename, data.dir = data.dir,
+                                              m = m, n = n, s = s, samps = params$untargeted.samples,
                                               scantimes = scantimes, mzvals = mzvals,
-                                              samples.df = samples.df,
-                                              output.dir = output.dir, plot.dir = plot.dir.untarg,
-                                              verbose = verbose, save.backup = save.backup,
-                                              ncores = ncores,
+                                              samples.df = params$samples.df,
+                                              plot.dir = plot.dir.untarg,
+                                              verbose = params$verbose, ncores = params$ncores,
                                               # Peak identification
-                                              win.size = win.size, peak.width.range = peak.width.range,
-                                              peak.trim = peak.trim, cutoff = cutoff, lives = lives,
+                                              win.size = params$win.size, peak.width.range = params$peak.width.range,
+                                              peak.trim = params$peak.trim, cutoff = params$cutoff, lives = params$lives,
                                               # Deconvoluton
-                                              stop.thres = stop.thres, tau = tau, cobs.tau = cobs.tau,
-                                              eps = eps, maxiter = maxiter, tol = tol,
-                                              basfun.u = basfun.u, sel.power = sel.power, t.power = t.power,
-                                              win.ext = win.ext, scale.subsamp = scale.subsamp,
+                                              stop.thres = params$stop.thres, tau = params$tau, cobs.tau = params$cobs.tau,
+                                              eps = params$eps, maxiter = params$maxiter, tol = params$tol,
+                                              basfun.u = params$basfun.u, sel.power = params$sel.power, t.power = params$t.power,
+                                              win.ext = params$win.ext, scale.subsamp = params$scale.subsamp,
                                               # Spectrum profiles update
-                                              method.upd = method.upd)
+                                              method.upd = params$method.upd)
+    if(params$save.backup){
+      filen <- paste0(params$output.dir, "3-Untargeted deconvolution-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
+      saveRDS(object = untarg.output, file = filen)
+      message(paste0("Backup saved as: ", filen))
+    }
+
     # TODO (optionally) fuse (near) identical spectrum profiles
   }
 
   ### B. TARGETED
 
   # Check the presence of a backup
-  targ.output <- check.for.backups(dir = output.dir, pattern = "4-Targeted deconvolution")
-  if(is.null(targ.output) && length(targeted.samples) > 0){
+  if(params$verbose) cat("\n--- Targeted Deconvolution ---\n\n")
+  targ.output <- check.for.backups(dir = params$output.dir, pattern = "4-Targeted deconvolution")
+  if(is.null(targ.output) && length(params$targeted.samples) > 0){
     # Create the plot directory for targeted
-    if(!is.null(plot.dir)){
-      plot.dir.targ <- paste0(plot.dir, "4-Targeted deconvolution/")
+    if(!is.null(params$plot.dir)){
+      plot.dir.targ <- paste0(params$plot.dir, "4-Targeted deconvolution/")
       dir.create(plot.dir.targ, showWarnings = FALSE)
+    } else {
+      plot.dir.targ <- NULL
     }
-    stop("Adapt targeted.deconvolution")
     # First fill missing elution profiles with a prior
     C.prior <- fill.C(C = untarg.output$C, m = m, n = n, s = s,
-                      untargeted.samples =  untargeted.samples, targeted.samples = targeted.samples)
+                      untargeted.samples =  params$untargeted.samples,
+                      targeted.samples = params$targeted.samples,
+                      win.ext = params$win.ext)
     # Perform targeted deconvolution
-    targ.output <- targeted.deconvolution(data.filename = data.filename, data.dir = data.dir,
-                                          S = untarg.output$S, C.prior = C.prior, m = m,
-                                          # Deconvolute all samples to extract profiles in targeted samples, and update profile in untargeted
-                                          samps = c(untargeted.samples, targeted.samples),
-                                          samples.df = samples.df, scantimes = scantimes, mzvals = mzvals,
-                                          output.dir = output.dir, plot.dir = plot.dir.targ,
-                                          verbose = verbose, save.backup = save.backup,
-                                          ncores = ncores, t.power = t.power, cobs.tau = cobs.tau,
-                                          smooth = FALSE, dampen = FALSE, unimodal = TRUE)
-  }
+    out <- targeted.deconvolution(data.filename = params$data.filename, data.dir = data.dir,
+                                  S = untarg.output$S, C.prior = C.prior, m = m,
+                                  # Deconvolute all samples to extract profiles in targeted samples, and update profile in untargeted
+                                  samps = c(params$untargeted.samples, params$targeted.samples),
+                                  samples.df = params$samples.df, scantimes = scantimes, mzvals = mzvals,
+                                  plot.dir = plot.dir.targ, verbose = params$verbose,
+                                  ncores = params$ncores, t.power = params$t.power, cobs.tau = params$cobs.tau,
+                                  smooth = FALSE, dampen = FALSE, unimodal = TRUE)
+    if(save.backup){
+      filen <- paste0(params$output.dir, "4-Targeted deconvolution-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
+      saveRDS(object = out,
+              file = filen)
+      message(paste0("Backup saved as: ", filen))
+    }
 
-  if(verbose) cat(paste0("\nOUTPUT\n\n", targ.output$notes, "\n"))
+  } else {
+    out <- untarg.output
+  }
   return(targ.output)
 }
 
@@ -1229,6 +1189,7 @@ extract.RTs <- function(standards.df, ref.samp, lib.type = "alkanes", ncores = 1
   lib.type <- match.arg(lib.type, c("alkanes", "FAMEs"))
 
   # Get the samples to extract RT/RI information from
+  files <- standards.df$file
   if(is.null(files)) stop("No standard found")
   # Extract reference sample information
   M.ref <- read.cdf(file = ref.samp, mz.ignore = mz.ignore)
@@ -1269,7 +1230,7 @@ extract.RTs <- function(standards.df, ref.samp, lib.type = "alkanes", ncores = 1
     # Remove the baseline
     C.bas <- bs(x = 1:nrow(M), df = bas.nknots - bas.degree, degree = bas.degree)
     S.bas <- fit.S.bas(M = M, C.bas = C.bas, tau = bas.tau, win = seq(1,nrow(M), by = bas.subsamp))
-    M <- pmax(M - tcrossprod(C.bas, S.bas), 0)
+    M <- pmax(M - Matrix::tcrossprod(C.bas, S.bas), 0)
 
     # Identify peaks
     # TODO try reusing get.peak.locations() by adapting the function
@@ -1466,11 +1427,11 @@ sparse.bs <- function(x, nknots, degree = 3, intercept = FALSE, sparse = FALSE){
 
 # untargeted.deconvolution ####
 # TODO doc
+# TODO the verbose in the function is to extensive and should be reduced to a few lines instead of a recurvsive prompt
 untargeted.deconvolution <- function(data.filename, data.dir,
                                      m, n, s, samps,
                                      scantimes, mzvals,
-                                     output.dir, plot.dir = NULL, verbose = TRUE,
-                                     save.backup = TRUE,
+                                     plot.dir = NULL, verbose = TRUE,
                                      samples.df,
                                      # Peak identification arguments
                                      win.size = 300,
@@ -1494,8 +1455,6 @@ untargeted.deconvolution <- function(data.filename, data.dir,
                                      # Spectrum profiles update arguments
                                      method.upd = "nnL0pois"){ # or WNNLS
   t1 <- proc.time()[3]
-  backup <- check.for.backups(dir = output.dir, pattern = "3-Untargeted deconvolution")
-  if(!is.null(backup)) return(backup)
 
   # Attach matrix
   data <- attach.big.matrix(dget(paste0(data.dir, data.filename, ".desc"))) # Baseline removed data
@@ -1567,9 +1526,12 @@ untargeted.deconvolution <- function(data.filename, data.dir,
   # Simultaneous update of the spectrum
   # Order profiles by increasing elution time (ie scanline where maximum occures
   # in profile)
-  if(verbose) cat("Sorting profiles by increasing retention time.")
+  if(verbose) cat("Sorting profiles by increasing retention time.\n")
   ord <- scanline.order(C = deconv.res$C, m = m) # 35 s for 1876 compounds and 50 samples
   # Update spectrum profiles
+  if(verbose) cat(paste0("Updating spectrum profiles\n",
+                         "Number of compounds: ", ncol(deconv.res$S), "\n",
+                         "Update method: ", method.upd, "\n"))
   system.time(upd <- update.spectrum(data = data,
                                      C = deconv.res$C[,ord,drop=F],
                                      S = deconv.res$S[,ord,drop=F],
@@ -1579,8 +1541,8 @@ untargeted.deconvolution <- function(data.filename, data.dir,
   if(!is.null(plot.dir)){
     png(file = paste0(plot.dir, "Spectrum update.png"), height = 3000, width = 3000, res = 300)
     par(mfrow = c(2,1))
-    plotmat(t(S.init), subsamp = 1, xlab = "Compound index", main = "Spectrum profiles before update")
-    plotmat(t(S.upd), subsamp = 1, xlab = "Compound index", main = "Spectrum profiles after update")
+    plotmat(t(as.matrix(deconv.res$S[,ord,drop=F])), subsamp = 1, xlab = "Compound index", main = "Spectrum profiles before update")
+    plotmat(t(as.matrix(upd$S)), subsamp = 1, xlab = "Compound index", main = "Spectrum profiles after update")
     dev.off()
   }
 
@@ -1593,7 +1555,7 @@ untargeted.deconvolution <- function(data.filename, data.dir,
                   "respectively.\n",
                   "Computed on: ", Sys.Date(), "\n",
                   "Timing: ",round((proc.time()[3] - t1)/60, 1) ," minutes\n",
-                  "The data is stored in: ", file.path, "\n")
+                  "The data is stored in: ", data.dir, "\n")
   if(verbose) cat(paste0("\nOUTPUT\n\n", notes, "\n"))
   out <- list(C = upd$C, S = upd$S, # Most important !
               # Disk-backed residual file
@@ -1608,11 +1570,6 @@ untargeted.deconvolution <- function(data.filename, data.dir,
               C.dic = C.dic,
               # Other
               notes = notes)
-  if(save.backup){
-    filen <- paste0(output.dir, "3-Untargeted deconvolution-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
-    saveRDS(object = out, file = filen)
-    message(paste0("Backup saved as: ", filen))
-  }
   return(out)
 }
 
@@ -1698,7 +1655,7 @@ fitqual.cv <- function(width, y) {
   X <- build.banded.gaus.mat(w = rep(width, length(y)), tol = 1E-5)
   coefs <- nnls(A = X[train,], b = y[train])$x
   fitqual <- get.BIC(y = y[test],
-                     yhat = tcrossprod(X[test,], coefs),
+                     yhat = Matrix::tcrossprod(X[test,], coefs),
                      npars = sum(coefs > 0),
                      transf = function(y) sqrt(y)) # Transforming on a sqrt scale leads to better results (common tranformation to account for Poisson error structure)
   return(fitqual)
@@ -1795,7 +1752,7 @@ block.deconvolution <- function(y, X, method = "NNLS", win.size = NULL, ...){
     # 3. Compute residuals
     if(i > 1){ # there is no previous window for the first window
       win.prev <- (1:win.size)+(i-2)*win.size # "-2" to get the previous index
-      b <- pmax(y[win.ind] - tcrossprod(X[win.ind, win.prev], coefs[win.prev]), 0)
+      b <- pmax(y[win.ind] - Matrix::tcrossprod(X[win.ind, win.prev], coefs[win.prev]), 0)
     }
     # 5. Perform deconvolution
     if(method == "NNLS"){
@@ -2058,7 +2015,7 @@ plot.compound.fit <- function(M, u, v, u.raw = NULL,
     plot(x = scantimes, y = u+1, log = "y", type = "l", col = "red3", ylim = c(1, max(u)),
          main = "Estimated elution profile", xlab = "Time (min)", ylab = "Intensity")
   }
-  plotmat(tcrossprod(u,v), subsamp = 1, gamma = gam, plot.axes = F, zlim = zlims,
+  plotmat(Matrix::tcrossprod(u,v), subsamp = 1, gamma = gam, plot.axes = F, zlim = zlims,
           main = "Fitted data", xlab = "Time", ylab = "Mass")
   suppressWarnings(plot(x = mzvalues, y = v, log = "y", type = "h", col = "blue4",
                         main = "Estimated spectrum profile", xlab = "Mass", ylab = "Intensity"))
@@ -2318,12 +2275,12 @@ scale.factors <- function(M, u, v, U.p = NULL, V.p = NULL, Plot = FALSE,
     comp.sel <- which(Matrix::colSums(U.p[win,]) > 0) # select the overlapping compounds
     nzero.v.ind <- which(Matrix::rowSums(cbind(v, V.p[,comp.sel])) > 0) # get the element indices where there is a non zero element in at least 1 factor
     # Create the covariate matrix
-    cov.mat <- matrix(as.vector(tcrossprod(u, v[nzero.v.ind])), ncol = 1) # The first covariate is the newly fitted factors
-    cov.add <- sapply(comp.sel, function(l){ return(as.vector(tcrossprod(U.p[win,l], V.p[nzero.v.ind,l]))) })
+    cov.mat <- matrix(as.vector(Matrix::tcrossprod(u, v[nzero.v.ind])), ncol = 1) # The first covariate is the newly fitted factors
+    cov.add <- sapply(comp.sel, function(l){ return(as.vector(Matrix::tcrossprod(U.p[win,l], V.p[nzero.v.ind,l]))) })
     cov.mat <- cbind(cov.mat, unlist(cov.add))
   } else {
     nzero.v.ind <- which(v > 0)
-    cov.mat <- matrix(as.vector(tcrossprod(u, v[nzero.v.ind])), ncol = 1) # If U.p and V.p are not supplied, scale u with no other covariate.
+    cov.mat <- matrix(as.vector(Matrix::tcrossprod(u, v[nzero.v.ind])), ncol = 1) # If U.p and V.p are not supplied, scale u with no other covariate.
   }
   # 3. Scale the factors using median regression
   y <- as.vector(pmax(M[win, nzero.v.ind] - bas[win, nzero.v.ind], 0)) # work on the original data, ignore points were fit is 0 for all factors
@@ -2813,7 +2770,7 @@ sequential.deconvolution <- function(resids, data = NULL,
               main = "Input data", xlab = "Time", ylab = "Mass")
       abline(v = length(win)/length(samps)*(1:(length(samps)-1)), col = "white")
       abline(v = which(peak == win), col = "red", lwd = 2)
-      plotmat(tcrossprod(u.unimod,v), subsamp = 1, plot.axes = F, zlim = zlims, gamma = gam,
+      plotmat(Matrix::tcrossprod(u.unimod,v), subsamp = 1, plot.axes = F, zlim = zlims, gamma = gam,
               main = "Extracted data", xlab = "Time", ylab = "Mass")
       abline(v = length(u.unimod)/length(samps)*(1:(length(samps)-1)), col = "white")
       abline(v = sub.peaks, col = "red", lwd = 2)
@@ -2906,7 +2863,7 @@ sequential.deconvolution <- function(resids, data = NULL,
     nzero.win <- win[u.all != 0]
     nzero.u.ind <- u.all != 0
     nzero.v.ind <- v != 0
-    M.fit <- as.matrix(tcrossprod(C[nzero.win,], S[nzero.v.ind,]))
+    M.fit <- as.matrix(Matrix::tcrossprod(C[nzero.win,], S[nzero.v.ind,]))
     M.obs <- resids[nzero.win, nzero.v.ind]
     M.bas <- as.matrix(bas[nzero.u.ind, nzero.v.ind])
     M.res <- pmax(M.obs - M.fit , 0) # Classical residuals
@@ -2979,7 +2936,7 @@ sequential.deconvolution <- function(resids, data = NULL,
       abline(v = length(win.plot)/length(samps)*(1:(length(samps)-1)), col = "white")
       abline(v = which(peak == win.plot), col = "red", lwd = 2)
       # Fitted
-      plotmat(tcrossprod(C[win.plot,i],v), subsamp = 1, plot.axes = F, zlim = zlims, main = "Extracted data", gamma = gam)
+      plotmat(Matrix::tcrossprod(C[win.plot,i],v), subsamp = 1, plot.axes = F, zlim = zlims, main = "Extracted data", gamma = gam)
       abline(v = length(win.plot)/length(samps)*(1:(length(samps)-1)), col = "white")
       # Residuals
       plotmat(resids[win.plot,], subsamp = 1, plot.axes = F, zlim = zlims, main = "Residual data after extraction", gamma = gam)
@@ -3026,7 +2983,7 @@ plot.deconvolution.fit <- function(M, M.res = NULL, C, S, m = NULL, win = NULL, 
   if(is.null(m)) m <- nrow(M)
   if(is.null(win)) win <- 1:m
   if(is.null(M.res)){
-    M.res <- pmax(M[win,] - tcrossprod(C[win,],S), 0) # TODO allow for adapted pearson residuals
+    M.res <- pmax(M[win,] - Matrix::tcrossprod(C[win,],S), 0) # TODO allow for adapted pearson residuals
   } else {
     M.res <- M.res[win,]
   }
@@ -3040,7 +2997,7 @@ plot.deconvolution.fit <- function(M, M.res = NULL, C, S, m = NULL, win = NULL, 
   plotmat(M[win,], subsamp = sub.fac, plot.axes = F, zlim = zlims, main = "Input data", gamma = gam)
   abline(v = samp.sep, col = "white")
   # Fitted
-  plotmat(tcrossprod(C[win,],S), subsamp = sub.fac, plot.axes = F, zlim = zlims, main = "Extracted data", gamma = gam)
+  plotmat(Matrix::tcrossprod(C[win,],S), subsamp = sub.fac, plot.axes = F, zlim = zlims, main = "Extracted data", gamma = gam)
   abline(v = samp.sep, col = "white")
   # Residuals
   plotmat(M.res, subsamp = sub.fac, plot.axes = F, zlim = zlims, main = "Residual data after extraction", gamma = gam)
@@ -3072,11 +3029,9 @@ plot.elution.overlay <- function(C, scantimes, facs, samps = NULL, const = 1, ..
 #   method:  "WNNLS" or "nnL0pois"
 #   focus:  should the spectrum profiles of a compound be focused on the sample
 #           where it is highest or on all samples ?
+#   verbose: should the progress be printed
 update.spectrum <- function(data, C, S, m = NULL, method = "nnL0pois",
                             focus = TRUE, verbose = FALSE){
-  if(verbose) cat(paste0("Updating spectrum profiles\n",
-                         "Number of compounds: ", ncol(S), "\n",
-                         "Update method: ", method, "\n"))
   if(is.null(m)) m <- nrow(data)
   n <- ncol(data)
 
@@ -3207,17 +3162,16 @@ targeted.deconvolution <- function(data.filename, data.dir,
                                    S, C.prior,
                                    m, samps, samples.df,
                                    scantimes, mzvals,
-                                   output.dir, plot.dir = NULL, verbose = TRUE,
-                                   ncores = 1, save.backup = TRUE,
+                                   plot.dir = NULL, verbose = TRUE,
+                                   ncores = 1,
                                    t.power = 2, cobs.tau = 0.2,
-                                   smooth = FALSE, dampen = FALSE,unimodal = FALSE){
-  stop("test this function!")
+                                   smooth = FALSE, dampen = FALSE, unimodal = FALSE){
   t1 <- proc.time()[3]
   # Get the data description file
   data.desc <- paste0(data.dir, data.filename, ".desc")
 
   # Extract the elution profiles given the target spectrum profiles
-  if(verbose) cat("Extract the target elution profiles.\n")
+  if(verbose) cat("Extracting the target elution profiles.\n")
   # Prepare cluster
   cl <- makeCluster(ncores, type = "SOCK") # TODO autodetect: on linux use type="FORK" (faster), but not available on windows
   registerDoSNOW(cl)
@@ -3258,22 +3212,16 @@ targeted.deconvolution <- function(data.filename, data.dir,
 
     # Process the elution profiles
     if(any(smooth, dampen, unimodal)){
-
-      # TODO
-      stop("Imporve the post processing, think about how to best impose unimodality, eventually slecting best peak based on the weighted cosine similarity, also remove empty compounds at the end of the update.")
-
       for(k in 1:ncol(C.samp)){
         nz <- Matrix::which(C.samp[,k] != 0)
-        # if(length(nz) == 0) next()
-        if(length(nz) == 0) return(rep(0, nrow(C.samp)))
+        if(length(nz) == 0) next()
         win <- min(nz):max(nz)
         y0 <- y <- C.samp[win,k]
 
         # Smooth profiles
         if(smooth){
           x <- 1:length(y)
-          # TODO add argument above ?
-          smooth.win <- 15
+          smooth.win <- 15 # TODO add argument above ?
           y <- pmax(loess(y ~ x, degree = 1, span = smooth.win/length(y))$fitted, 0)
           # y <- pmax(sgolayfilt(runmed(y, k = 15), p = 1, n = 15),0)
         }
@@ -3288,6 +3236,7 @@ targeted.deconvolution <- function(data.filename, data.dir,
 
         # Impose unimodality constraints
         if(unimodal){
+          # TODO think about how to best impose unimodality, eventually selecting best peak based on the weighted cosine similarity, also remove empty compounds at the end of the update
           w.y <- y^2/sum(y^2)*length(y)
           peak.pos <- which.max(y)
           y <- pickLogConPeak(y = y, tau = cobs.tau, weights = w.y,
@@ -3299,15 +3248,15 @@ targeted.deconvolution <- function(data.filename, data.dir,
 
     # Plot elution profiles
     if(!is.null(plot.dir)){
-      png(filename = paste0(plot.dir, "Sample - ", gsub(pattern = "[.]|/", replacement = "", x = sample.names[samp]), ".png"),
+      png(filename = paste0(plot.dir, "Sample - ", gsub(pattern = "[.]|/", replacement = "", x = samples.df$name[samp]), ".png"),
           res = 300, height = 4000, width = 6000)
       par(mfrow = c(2,1))
       gam <- 0.1
       zlims <- c(0, max(M.samp))^gam
       subf <- 10
       plotmat(M.samp[seq(1, m, by = subf),], gamma = gam, zlim = zlims,
-              subsamp = 1, main = paste0("Input data - Sample ", sample.df$names[samp]))
-      plotmat(tcrossprod(C.samp[seq(1, m, by = subf),], S), gamma = gam,
+              subsamp = 1, main = paste0("Input data - Sample ", samples.df$name[samp]))
+      plotmat(Matrix::tcrossprod(C.samp[seq(1, m, by = subf),], S), gamma = gam,
               zlim = zlims, subsamp = 1, main = "Extracted elution profiles")
       dev.off()
     }
@@ -3324,14 +3273,8 @@ targeted.deconvolution <- function(data.filename, data.dir,
                   "stored in 'S'.\n",
                   "Computed on: ", Sys.Date(), "\n",
                   "Timing: ", round((proc.time()[3] - t1)/60, 2), " minutes.\n")
-  if(verbose) cat(notes)
+  if(verbose) cat(paste0("\nOUTPUT\n\n", notes))
   out <- list(C = C, S = S, notes = notes)
-  if(save.backup){
-    filen <- paste0(output.dir, "4-Targeted deconvolution-", gsub("[-]|[:]|[ ]", "", Sys.time()), ".rds")
-    saveRDS(object = out,
-            file = filen)
-    message(paste0("Backup saved as: ", filen))
-  }
   return(out)
 }
 
@@ -3353,17 +3296,19 @@ get.C.prior <- function(RT.df, m, s){
 
 # fill.C ####
 # TODO doc
-fill.C <- function(C, m, n, s, untargeted.samples, targeted.samples){
-  stop("test this function!")
+fill.C <- function(C, m, n, s,
+                   untargeted.samples, targeted.samples,
+                   win.ext = 25){
   # Initialize the elution profiles for the targeted samples, this is common to all the targeted samples
-  C.targ <- Matrix(0, nrow = m, ncol = n,  sparse = TRUE)
+  C.targ <- Matrix(0, nrow = m, ncol = ncol(C),  sparse = TRUE)
   for(k in 1:ncol(C)){
-    elus <- C[(1:m) + (untargeted.samples-1)*m, k, drop=F]
+    elus <- C[rep(1:m, length(untargeted.samples)) + (rep(untargeted.samples, each = m)-1)*m, k, drop=F]
     nz <- Matrix::which(elus > 0)
     if(length(nz) == 0) next()
     win <- range(nz - (ceiling(nz/m)-1)*m)
-    win <- win[1]:win[2]
+    win <- max(win[1]-win.ext, 1):min(win[2]+win.ext, m)
     # TODO possible options: average profile, constant prior where nonzero
+    method <- "window"
     if(method == "average"){
       elus <- sapply(untargeted.samples, function(samp) return(C[win + rep((samp-1)*m, length(win)),k]))
       elus <- rowMeans(elus)
