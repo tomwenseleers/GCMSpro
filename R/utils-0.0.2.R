@@ -214,35 +214,10 @@ normS <- function(S, by=2, ntype = 1){
 ####---- EXPORTED FUNCTIONS ----####
 
 
-# initiate.parameters ####
-# Function that generates the all required variables to start a new GC-MS
-# processing run.
-# INPUT
-#   base.dir:     a character string that indicates the path to the folder were
-#                 to run the processing. The folder should contain at least the
-#                 sample information table.
-#   Plot:   Should intermediate plots be stored?
-#   sample.file:  the name or path to the CSV file containing the required sample
-#                 information.
-#   compound.file:  the name or path to the CSV file containing the required target
-#                 information.
-# TODO compound.file should become target list when there is an automatic target table building function
-# OUTPUT
-#   base.dir:   the supplied base directory
-#   output.dir: the directory were results and backups will be saved
-#   plot.dir:   the directory were plots will be saved. When NULL, no plotting.
-#   samples.df: a data.frame with the parsed sample information
-#   compounds.df: a data.frame with the parsed target information or NULL if no
-#               file was supplied
-
-
-
-
-
 #' Initiate parameters for a new GCMS data processing run
 #'
 #' The function generates a list with all required arguments for controlling the
-#' processing of GCMS data. Input checks are performed to ensure that the
+#' processing of GCMS data. Input checks on the files are performed to ensure that the
 #' supplied information complies to the expected input.
 #'
 #' @param base.dir
@@ -250,31 +225,51 @@ normS <- function(S, by=2, ntype = 1){
 #' GCMS data processing.
 #' @param Plot
 #' should intermediate plots be generated ? Watch out the files containing the
-#' plots will take up some disk space. Make sure to have sufficients disk space
-#' (+/- 2 MB/sample).
-#' TODO check disk space taken by files
+#' plots will take up some disk space. Make sure to have sufficients disk space.
 #' #' @param verbose
 #' should progress information be printed to the console ?
 #' @param save.backup
 #' should a backup be saved after every pipeline step ? Watch out the backup
-#' files will take up some disk space. Make sure to have sufficients disk space
-#' (+/- 5 MB/sample).
-#' TODO check disk space taken by files
+#' files will take up some disk space. Make sure to have sufficients disk space.
 #' @param ncores
 #' Number of cores to use for computation (using the \code{\link{snow}} package)
 #' of parallelized steps.
 #' @param sample.file
 #' the name or path to the CSV file containing the required sample information.
+#' The file should contains at least the following headers: \code{name}, 
+#' \code{file}, \code{type}, \code{date}, \code{batch}.
 #' @param compound.file
-#' the name or path to the CSV file containing the candidate compounds
-#' information for identification.
+#' the name or path to the CSV file containing the candidate compounds for 
+#' identification. The file should contains at least the following headers: 
+#' \code{compound}, \code{RI}, \code{spectrum}.
 #' @param ref.samp
+#' The reference sample used to extract the reference time scale and m/z value 
+#' scale. The sample can be given as the index in \code{compound.file} or as 
+#' the file path to the CSV file. By default, the first sample in the supplied 
+#' table is chosen.
 #' @param mz.ignore
-#' @param lib.type
+#' A vector contraining the m/z values to ignore during the processing.
+#' @param std.lib
+#' A string indicating which library of standard compounds should be used for 
+#' calibration. Currently, only \code{"alkanes"} for linear alkane calibration 
+#' is supplied.
 #' @param data.filename
+#' the name of the file containing the combined data. It is advised to used a 
+#' different name for different runs/experiments in case the same data should be
+#' analyzed with different settings.
 #' @param enc
+#' The type of encoding of the data. \code{integer} or \code{double}. While the 
+#' former takes up less storage spess, the second allows for decimal values.
 #' @param data.dir
+#' The path where the data should be stored. If \code{NULL}, it is saved in a
+#' subdirectory called \code{disk backed data/}.
+#' 
+#' 
+#' \strong{Advanced parameters.}
+#' 
+#' 
 #' @param bas.tau
+#' The \code{tau}
 #' @param bas.nknots
 #' @param bas.degree
 #' @param bas.subsamp
@@ -315,7 +310,7 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
                                 # TODO allow that a reference sample is not supplied but that the users gives all the reference parameters: scantime, mzvalue, day, batch,...
                                 ref.samp = 1, # can be numeric (index in sample table) or character (path to sample)
                                 mz.ignore = NULL,
-                                lib.type = "alkanes",
+                                std.lib = "alkanes",
                                 # Preprocessing parameters
                                 data.filename = "data",
                                 enc = "integer", # or "double" but requires more RAM
@@ -410,7 +405,7 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
               samples.df = samples.df, standards.df = standards.df,  compounds.df = compounds.df,
               verbose = verbose, save.backup = save.backup, ncores = ncores,
               # RT calibration
-              ref.samp = ref.samp,  mz.ignore = mz.ignore,  lib.type = lib.type,
+              ref.samp = ref.samp,  mz.ignore = mz.ignore,  std.lib = std.lib,
               # Preprocessing parameters
               data.filename = data.filename, enc = enc, data.dir = data.dir,
               bas.tau = bas.tau, bas.nknots = bas.nknots, bas.degree = bas.degree,
@@ -444,12 +439,12 @@ RT.calibration <- function(params){
 
   if(params$verbose) cat(paste0("Number of samples: ", nrow(params$standards.df), "\n",
                                 "Number of cores: ", params$ncores, "\n",
-                                "Calibration compounds: ", params$lib.type, "\n\n"))
+                                "Calibration compounds: ", params$std.lib, "\n\n"))
 
   # Extract RT information from standards
   if(params$verbose) cat("Extracting the RT information from the standard samples...")
   RT.extraction <- extract.RTs(standards.df = params$standards.df, ref.samp = params$ref.samp,
-                               lib.type = params$lib.type, ncores = params$ncores,
+                               std.lib = params$std.lib, ncores = params$ncores,
                                mz.ignore = params$mz.ignore, plot.folder = plot.subdir,
                                # Baseline fitting
                                # TODO get the parameters out of params?
@@ -507,7 +502,7 @@ RT.calibration <- function(params){
 
   # Return the results
   notes <- paste0("The generated list contains the RT calibration models extracted from ",
-                  nrow(params$standards.df), " sample containing ", params$lib.type, " as standards.\n",
+                  nrow(params$standards.df), " sample containing ", params$std.lib, " as standards.\n",
                   "Computed on: ", Sys.Date(), "\n",
                   "Timing: ",round((proc.time()[3] - t1)/60, 1) ," minutes\n",
                   "The RT to RI model is stored in \'RT.to.RI.model\' (used to convert the observed RT to theoretical RI)\n",
@@ -1173,7 +1168,7 @@ find.standards <- function(lib, specs, RT, RI, df = NULL, sr = NULL,
 
 # extract.RTs ####
 # TODO documentation
-extract.RTs <- function(standards.df, ref.samp, lib.type = "alkanes", ncores = 1,
+extract.RTs <- function(standards.df, ref.samp, std.lib = "alkanes", ncores = 1,
                         plot.folder = NULL, mz.ignore = NULL,
                         # Baseline fitting
                         bas.subsamp = 10, bas.tau = 0.2, bas.nknots = 15,
@@ -1186,7 +1181,7 @@ extract.RTs <- function(standards.df, ref.samp, lib.type = "alkanes", ncores = 1
                         tol = 0.01, basfun.u = function(x) return(min(x)),
                         sel.power = 2, t.power = 2, win.ext = 25,
                         scale.subsamp = 10){
-  lib.type <- match.arg(lib.type, c("alkanes", "FAMEs"))
+  std.lib <- match.arg(std.lib, c("alkanes", "FAMEs"))
 
   # Get the samples to extract RT/RI information from
   files <- standards.df$file
@@ -1203,7 +1198,7 @@ extract.RTs <- function(standards.df, ref.samp, lib.type = "alkanes", ncores = 1
   peak.width.fun <- peak.widths$peak.width.fun
 
   # Get information from the target library
-  if(lib.type == "alkanes") targ.lib <- load.alkane.lib() # TODO allow also for FAMEs
+  if(std.lib == "alkanes") targ.lib <- load.alkane.lib() # TODO allow also for FAMEs
   specs.lib <- lib.to.spec(lib = targ.lib, mzvals = mzvals.ref, norm = 1)
   monoMW <- round(sapply(targ.lib, "[[", "monoMW"))
   RIs <- sapply(targ.lib, "[[", "RI")
