@@ -232,71 +232,121 @@ normS <- function(S, by=2, ntype = 1){
 #' should a backup be saved after every pipeline step ? Watch out the backup
 #' files will take up some disk space. Make sure to have sufficients disk space.
 #' @param ncores
-#' Number of cores to use for computation (using the \code{\link{snow}} package)
+#' number of cores to use for computation (using the \code{\link{snow}} package)
 #' of parallelized steps.
 #' @param sample.file
 #' the name or path to the CSV file containing the required sample information.
-#' The file should contains at least the following headers: \code{name}, 
+#' The file should contains at least the following headers: \code{name},
 #' \code{file}, \code{type}, \code{date}, \code{batch}.
 #' @param compound.file
-#' the name or path to the CSV file containing the candidate compounds for 
-#' identification. The file should contains at least the following headers: 
+#' the name or path to the CSV file containing the candidate compounds for
+#' identification. The file should contains at least the following headers:
 #' \code{compound}, \code{RI}, \code{spectrum}.
 #' @param ref.samp
-#' The reference sample used to extract the reference time scale and m/z value 
-#' scale. The sample can be given as the index in \code{compound.file} or as 
-#' the file path to the CSV file. By default, the first sample in the supplied 
+#' the reference sample used to extract the reference time scale and m/z value
+#' scale. The sample can be given as the index in \code{compound.file} or as
+#' the file path to the CSV file. By default, the first sample in the supplied
 #' table is chosen.
 #' @param mz.ignore
-#' A vector contraining the m/z values to ignore during the processing.
+#' a vector contraining the m/z values to ignore during the processing.
 #' @param std.lib
-#' A string indicating which library of standard compounds should be used for 
-#' calibration. Currently, only \code{"alkanes"} for linear alkane calibration 
+#' a string indicating which library of standard compounds should be used for
+#' calibration. Currently, only \code{"alkanes"} for linear alkane calibration
 #' is supplied.
 #' @param data.filename
-#' the name of the file containing the combined data. It is advised to used a 
+#' the name of the file containing the combined data. It is advised to used a
 #' different name for different runs/experiments in case the same data should be
 #' analyzed with different settings.
 #' @param enc
-#' The type of encoding of the data. \code{integer} or \code{double}. While the 
+#' the type of encoding of the data. \code{integer} or \code{double}. While the
 #' former takes up less storage spess, the second allows for decimal values.
 #' @param data.dir
-#' The path where the data should be stored. If \code{NULL}, it is saved in a
+#' the path where the data should be stored. If \code{NULL}, it is saved in a
 #' subdirectory called \code{disk backed data/}.
-#' 
-#' 
+#'
+#'
 #' \strong{Advanced parameters.}
-#' 
-#' 
-#' @param bas.tau
-#' The \code{tau}
-#' @param bas.nknots
-#' @param bas.degree
-#' @param bas.subsamp
-#' @param untargeted
-#' @param win.size
-#' @param peak.width.range
-#' @param peak.trim
-#' @param cutoff
-#' @param lives
-#' @param stop.thres
+#'
+#'
 #' @param tau
+#' The \code{tau} parameter for quantile regression. This serves as an
+#' underapproximation parameter for fitting the signal. Should be greater
+#' than 0 (complete underapproximation) and smaller than 1 (complete
+#' overapproximation). \code{tau == 0.5} boils down to median regression. A
+#' value of 0.2 seems to work best in most cases.
+#' @param bas.tau
+#' Same as \code{tau} but for fitting the baseline spectrum profiles.
+#' @param bas.nknots
+#' the number of knots (~ flexion points) to use to build the baseline elution
+#' profiles.
+#' @param bas.degree
+#' the degree of the splines used to construct the baseline
+#' @param bas.subsamp
+#' a subsampling factor >=1 indicating by how much the data should be sampled
+#' for fitting the baseline. This values means taking one scanline every
+#' \code{bas.subsamp} scanlines. When \code{bas.subsamp == 1}, no subsapling is
+#' performed. This allows dramatic increase in speed when preprocessing the
+#' data.
+#' @param untargeted.samples
+#' a vector of sample names or sample indices for which an untargeted
+#' deconvolution should be performed.
+#' @param win.size
+#' the size of the window (in number of scanlines) used for optimizing the
+#' elution peak width during the untargeted deconvolution initialization.
+#' @param peak.width.range
+#' a range wihtin which the peak width is optimized. The peak width is the
+#' number of scanlines between the inflection points#'
+#' @param peak.trim
+#' a threshold under which values of the initial Gaussian elution profiles are
+#' clipped to 0.
+#' @param cutoff
+#' a threshold that filters out peak for which the ratio between peak height and
+#' the baseline is smaller or equal than this threshold.
+#' @param lives
+#' the maximal number of times a initialized peak can be extracted during the
+#' untargeted deconvolution
+#' @param stop.thres
+#' a threshold that stops the untargeted deconvolution once the highest
+#' remaining peaks is not higher than the threshold times the height of the
+#' highest initial peak.
 #' @param cobs.tau
+#' the tau parameters for the unimodalite constraints (see \code{\link{cobs}})
 #' @param eps
+#' a threshold under which measured and extracted itensities are trimmed to 0
 #' @param maxiter
+#' the maximum number of iterations when optimizing the spectrum profiles
+#' within the untargeted deconvolution
 #' @param tol
+#' a threshold that stops the spectrum optimization loop once the difference in
+#' spectra between two consecutive iteration is lower than that threshold.
 #' @param basfun.u
+#' a function to estimate a baseline given an extracted elution profiles. The
+#' output of the function is then subtracted from the elution profiles.
 #' @param sel.power
+#' a factor that influences the weights on selective ions when estimating the
+#' elution profiles from the spectrum profiles. The higher the factor, the more
+#' weights on selective ions.
 #' @param t.power
+#' a factor that influences the weights when estimating the spectrum profiles
+#' from the elution profiles. The higher the factor, the more weight is put on
+#' high itensity values.
 #' @param win.ext
+#' the number of scanlines to extend the search window on each side when
+#' extracting profiles in all samples given the optimization in the sample
+#' with the highest peak height sample.
 #' @param scale.subsamp
+#' a subsampling factor >=1 indicating by how much the data should be sampled
+#' when scaling the extracted elution profiles using the median regression.
 #' @param method.upd
-#' @param max.RI.sd
-#' @param elu.win
+#' the method used to optimize simultaneously the spectrum profiles at the end
+#' of the untargeted deconvolution algorithm. Available methods are weighted
+#' nonnegative least squares regression (\code{WNNLS}) or nonnegative L0 poisson
+#' regression (\code{nnL0pois}).
 #'
 #' @return
 #'
-#' TODO a list
+#' a list containing the required parameters for running the next steps of the
+#' GC-MS processing pipeline
 #'
 #' @export
 #'
@@ -337,9 +387,7 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
                                 t.power = 2,
                                 win.ext = 25,
                                 scale.subsamp = 10,
-                                method.upd = "nnL0pois",
-                                max.RI.sd = 50,
-                                elu.win = 60){
+                                method.upd = "nnL0pois"){
 
 
   if(verbose) cat("====== Initializing a new GC-MS processing run ======\n\n")
@@ -416,13 +464,25 @@ initiate.parameters <- function(base.dir, Plot = TRUE, verbose = TRUE,
               peak.trim = peak.trim, cutoff = cutoff, lives = lives, stop.thres = stop.thres,
               tau = tau, cobs.tau = cobs.tau, eps = eps, maxiter = maxiter, tol = tol,
               basfun.u = basfun.u, sel.power = sel.power, t.power = t.power,
-              win.ext = win.ext, scale.subsamp = scale.subsamp,  method.upd = method.upd,
-              max.RI.sd = max.RI.sd, elu.win = elu.win))
+              win.ext = win.ext, scale.subsamp = scale.subsamp,  method.upd = method.upd))
 }
 
 
 # RT.calibration ####
-# TODO doc
+#' Performs retention time calibration from the standard samples
+#'
+#' The function extract the RT/RI information from the standard samples and
+#' builds the RT calibration model given a reference sample.
+#'
+#' @param params
+#' the ouptut of the \code{\link{initiate.parameters}} function.
+#'
+#' @return
+#'
+#' a list with the calibration results
+#'
+#' @export
+#'
 RT.calibration <- function(params){
   if(params$verbose) cat("====== RT extraction of calibration compounds ======\n\n")
   # Search for backups
@@ -524,22 +584,29 @@ RT.calibration <- function(params){
 }
 
 # preprocessing ####
-# Function to perform preprocessing on the samples and store them in a single
-# disk-backed file (bigmatrix object). The preprocessing consists of
-#   - Calibrating the RT of every sample to a reference RT
-#   - Interpolate time and mz axis to a common scale
-#   - Fit and subtract background
-# INPUT
-#   params
-#   calibration.output
-# OUTPUT
-#   file.bin
-#   file.desc
-#   data.dir
-#   C.bas
-#   S.bas
-#   notes
-# TODO doc
+#' Performs preprocessing of the samples and combines data in a single matrix.
+#'
+#' Function to perform preprocessing on the samples and store them in a single
+#' disk-backed file (\code{\link{bigmemory}} object). The preprocessing consists
+#' in:
+#' \itemize{
+#' \item{Calibrating the RT of every sample to a reference RT}
+#' \item{Interpolate time and mz axis to a common scale}
+#' \item{Fit and subtract background}
+#' }
+#'
+#' @param params
+#' the ouptut of the \code{\link{initiate.parameters}} function.
+#' @param calibration.output
+#' the ouptut of the \code{\link{RT.calibration}} function.
+#'
+#' @return
+#'
+#' a list with the preprocessing results. Note that a disk-backed file is also
+#' saved in the supplied directory (do not manually change or move the file).
+#'
+#' @export
+#'
 preprocessing <- function(params,
                           calibration.output){
   if(params$verbose) cat("======= Preprocessing samples =====\n\n")
@@ -685,7 +752,34 @@ preprocessing <- function(params,
 
 
 # deconvolution ####
-# TODO doc
+#' Performs deconvolution of the the preprocessed GC-MS data
+#'
+#' Function to perform deconvolution of the data. The deconvolution is split in
+#' 2 steps
+#' \itemize{
+#' \item{The untargeted deconvolution blindly extracts the elution and spectrum
+#' profiles from the set of untargeted samples.}
+#' \item{The targeted deconvolution uses the profiles extracted in the
+#' untargeted step as prior knowledge. The spectrum profiles areused as
+#' covariates wghile the elution profiles are used to define extraction windows.}
+#' }
+#'
+#' @param params
+#' the ouptut of the \code{\link{initiate.parameters}} function.
+#' @param calibration.output
+#' the ouptut of the \code{\link{RT.calibration}} function.
+#' @param preprocess.output
+#' the ouptut of the \code{\link{preprocessing}} function.
+#'
+#' @return
+#'
+#' a list with the deconvolution results. Note that, if required, two backup
+#' files are generated: one containing the untageted deconvolution results (from
+#' which the prior information can be extracted), the other containing the
+#' final deconvolution.
+#'
+#' @export
+#'
 deconvolution <- function(params,
                           calibration.output,
                           preprocess.output){
@@ -2385,8 +2479,7 @@ update.detection <- function(Y, Dic, peaks, cutoff, sel = NULL, m = length(Y)){
     x.bas <- cbind(1, 1:length(y)) # The baseline is made of a slope + intercept
     bas <- x.bas %*% suppressWarnings(rq.fit.br(y = y, x = x.bas, tau = 0.5)$coefficients) # warnings:  In rq.fit.br(y = y, x = x.bas, tau = 0.1) : Solution may be nonunique
     # Compute the filtering criterion
-    ratio <- log10(row["height"])/bas[which.max(peak.shape)] # Compute the ratio between baseline and peak signal at max
-    row["crit"] <- ratio
+    row["crit"] <- log10(row["height"])/bas[which.max(peak.shape)] # Compute the ratio between baseline and peak signal at max
     row["active"] <- as.numeric(row["crit"] > cutoff)
     row["lives"] <- ifelse(row["active"] - old.active == 1, row["lives"]-1, row["lives"]) # remove a "life" when peak gets reactivated
     return(row)
